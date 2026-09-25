@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+@theme {
+  --color-gold: #b9914d;
+  --color-gold-deep: #8a6b2e;
+  --color-light-gold: #f4c566;
+  --color-dark: #0a1d28;
+  --color-teal: #289c9e;
+  --color-beige: #d6c084;
+  --color-cream: #f7f0e1;
+  --color-green: #567c48;
+  --color-dark-teal: #1e5e65;
+  --color-orange: #d58723;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background-color: var(--color-cream);
+  color: var(--color-dark);
+}
+
+/* subtle focus ring */
+*:focus-visible {
+  outline: 2px solid var(--color-teal);
+  outline-offset: 2px;
+}
