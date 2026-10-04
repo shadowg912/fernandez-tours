@@ -1,9 +1,9 @@
 "use client";
 
-import { Client, PayFrequency, Payment, Service, Student } from "@/lib/types";
+import { Client, Payment, Service, Student } from "@/lib/types";
 import { formatDateShort } from "@/lib/format";
 import { Avatar, Card, Chip, Money, StatusBadge } from "./ui";
-import { IconMoney, IconPhone } from "./icons";
+import { IconMoney, IconPhone, IconCheck } from "./icons";
 
 /* ---------- SummaryCard ---------- */
 export function SummaryCard({ value, label, accent = false }: { value: string; label: string; accent?: boolean }) {
@@ -84,56 +84,60 @@ export function ClientCard({ client, onClick }: { client: Client; onClick?: () =
 }
 
 /* ---------- StudentCard ---------- */
-const frequencyLabel: Record<PayFrequency, string> = {
-  mensual: "Mensual",
-  quincenal: "Quincenal",
-  semanal: "Semanal",
-};
 
-const frequencySuffix: Record<PayFrequency, string> = {
-  mensual: "mes",
-  quincenal: "quincena",
-  semanal: "semana",
-};
-
-export function StudentCard({ student, onPay, onClick }: { student: Student; onPay?: () => void; onClick?: () => void }) {
+export function StudentCard({ 
+  student, 
+  onPay, 
+  onClick, 
+  onQuickPay 
+}: { 
+  student: Student; 
+  onPay?: () => void; 
+  onClick?: () => void;
+  onQuickPay?: () => void;
+}) {
   return (
     <div onClick={onClick} className="cursor-pointer">
       <Card className="p-4 hover:border-teal/40 hover:shadow-md transition-all">
         <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-semibold truncate">{student.name}</p>
-          <p className="text-sm text-dark/60 truncate">{student.school}</p>
-          <p className="text-xs text-dark/50 truncate">{student.address}</p>
+          <div className="min-w-0">
+            <p className="font-semibold truncate">{student.name}</p>
+            <p className="text-sm text-dark/60 truncate">{student.school}</p>
+            <p className="text-xs text-dark/50 truncate">{student.frequency === 'semanal' ? 'Semanal' : student.frequency === 'quincenal' ? 'Quincenal' : 'Mensual'}</p>
+          </div>
+          {student.paid ? <Chip tone="teal">Pagado</Chip> : <Chip tone="danger">Pendiente</Chip>}
         </div>
-        {student.paid ? <Chip tone="teal">Pagado</Chip> : <Chip tone="danger">Pendiente</Chip>}
-      </div>
-      <div className="mt-3 flex flex-wrap items-center gap-1.5">
-        {student.days.map((d) => (
-          <span key={d} className="rounded-md bg-beige/40 px-2 py-0.5 text-[11px] font-medium text-dark/70">
-            {d}
-          </span>
-        ))}
-        <Chip tone="gold">{frequencyLabel[student.frequency]}</Chip>
-      </div>
-      <div className="mt-3 flex items-center justify-between gap-3">
-        <p className="min-w-0 text-sm">
-          <Money amount={student.monthlyFee} className="text-gold-deep" />{" "}
-          <span className="text-dark/50 text-xs">/ {frequencySuffix[student.frequency]}</span>
-        </p>
-        {!student.paid && onPay && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onPay();
-            }}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-teal px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-all hover:bg-dark-teal active:scale-[.97]"
-          >
-            <IconMoney className="h-4 w-4" />
-            Registrar pago
-          </button>
+        {!student.paid && (onPay || onQuickPay) && (
+          <div className="mt-3 flex items-center justify-end gap-2">
+            {onQuickPay && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  onQuickPay();
+                }}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-gold px-3 py-2 text-xs font-bold text-white shadow-sm transition-all hover:bg-light-gold hover:text-dark active:scale-[.97]"
+                title="Pago rápido (efectivo, hoy)"
+              >
+                <IconCheck className="h-3.5 w-3.5" />
+                Pago rápido
+              </button>
+            )}
+            {onPay && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  onPay();
+                }}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-teal px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-all hover:bg-dark-teal active:scale-[.97]"
+              >
+                <IconMoney className="h-4 w-4" />
+                Registrar pago
+              </button>
+            )}
+          </div>
         )}
-      </div>
       </Card>
     </div>
   );
