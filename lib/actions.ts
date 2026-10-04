@@ -47,6 +47,22 @@ export async function markStudentPaid(student: { id: string; name: string; month
   revalidatePath("/pagos");
 }
 
+export async function quickPayStudent(id: string) {
+  const today = new Date().toISOString().slice(0, 10);
+  const rows = await query<{ monthly_fee: number; name: string }>("select monthly_fee, name from students where id=$1", [id]);
+  if (rows.length === 0) throw new Error("Estudiante no encontrado");
+  const student = rows[0];
+  
+  await query("update students set paid=true where id=$1", [id]);
+  await query(
+    `insert into payments (client_name, date, concept, amount, method, status)
+     values ($1,$2,$3,$4,'efectivo','completado')`,
+    [student.name, today, `Transporte estudiantil — pago rápido`, student.monthly_fee]
+  );
+  revalidatePath("/transporte");
+  revalidatePath("/pagos");
+}
+
 /* ---------- Servicios ---------- */
 export async function createService(d: ServiceDraft) {
   await query(

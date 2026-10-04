@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { Student, StudentDraft } from "@/lib/types";
 import { formatMoney } from "@/lib/format";
-import { createStudent, deleteStudent, markStudentPaid, updateStudent } from "@/lib/actions";
+import { createStudent, deleteStudent, markStudentPaid, updateStudent, quickPayStudent } from "@/lib/actions";
 import { StudentCard, SummaryCard } from "@/components/cards";
 import { Avatar, Button, Chip, EmptyState, Modal, Toast } from "@/components/ui";
 import { ConfirmDialog, PaymentForm, StudentForm } from "@/components/forms";
@@ -81,6 +81,11 @@ export default function TransporteClient({ students }: { students: Student[] }) 
     }, "Estudiante eliminado");
   };
 
+  const onQuickPay = (student: Student) =>
+    run(async () => {
+      await quickPayStudent(student.id);
+    }, `Pago rápido registrado para ${student.name}`);
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3">
@@ -119,7 +124,13 @@ export default function TransporteClient({ students }: { students: Student[] }) 
           <h2 className="mb-3 text-lg font-bold">Pagos pendientes</h2>
           <div className="space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0">
             {pendingStudents.map((s) => (
-              <StudentCard key={s.id} student={s} onPay={() => setPayStudent(s)} onClick={() => setSelectedId(s.id)} />
+              <StudentCard 
+                key={s.id} 
+                student={s} 
+                onPay={() => setPayStudent(s)} 
+                onClick={() => setSelectedId(s.id)}
+                onQuickPay={() => onQuickPay(s)}
+              />
             ))}
           </div>
         </section>
@@ -137,7 +148,13 @@ export default function TransporteClient({ students }: { students: Student[] }) 
         ) : (
           <div className="space-y-3 md:grid md:grid-cols-2 xl:grid-cols-3 md:gap-3 md:space-y-0">
             {filtered.map((s) => (
-              <StudentCard key={s.id} student={s} onPay={() => setPayStudent(s)} onClick={() => setSelectedId(s.id)} />
+              <StudentCard 
+                key={s.id} 
+                student={s} 
+                onPay={() => setPayStudent(s)} 
+                onClick={() => setSelectedId(s.id)}
+                onQuickPay={() => onQuickPay(s)}
+              />
             ))}
           </div>
         )}
