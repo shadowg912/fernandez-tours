@@ -30,7 +30,8 @@ export interface Student {
   name: string;
   school: string;
   address: string;
-  schedule: string;
+  entryTime: string; // HH:MM 24h
+  exitTime: string;  // HH:MM 24h
   days: string[];
   monthlyFee: number;
   frequency: PayFrequency;

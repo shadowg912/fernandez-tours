@@ -303,7 +303,8 @@ function StudentFormInner({
   const [name, setName] = useState(initial?.name ?? "");
   const [school, setSchool] = useState(initial?.school ?? "");
   const [address, setAddress] = useState(initial?.address ?? "");
-  const [schedule, setSchedule] = useState(initial?.schedule ?? "");
+  const [entryTime, setEntryTime] = useState(initial?.entryTime ?? "07:00");
+  const [exitTime, setExitTime] = useState(initial?.exitTime ?? "14:00");
   const [days, setDays] = useState<string[]>(initial?.days ?? []);
   const [frequency, setFrequency] = useState<PayFrequency>(initial?.frequency ?? "mensual");
   const [monthlyFee, setMonthlyFee] = useState(initial ? String(initial.monthlyFee) : "");
@@ -322,7 +323,8 @@ function StudentFormInner({
         name: name.trim(),
         school: school.trim(),
         address: address.trim(),
-        schedule: schedule.trim(),
+        entryTime,
+        exitTime,
         days,
         frequency,
         monthlyFee: Number(monthlyFee) || 0,
@@ -347,9 +349,14 @@ function StudentFormInner({
         <Field label="Dirección de recogida">
           <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Sector, ciudad" required />
         </Field>
-        <Field label="Horario">
-          <Input value={schedule} onChange={(e) => setSchedule(e.target.value)} placeholder="Ej. 6:45 AM - 2:30 PM" required />
-        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Hora de entrada">
+            <Input type="time" value={entryTime} onChange={(e) => setEntryTime(e.target.value)} required />
+          </Field>
+          <Field label="Hora de salida">
+            <Input type="time" value={exitTime} onChange={(e) => setExitTime(e.target.value)} required />
+          </Field>
+        </div>
         <Field label="Días de transporte">
           <div className="flex flex-wrap gap-2">
             {allDays.map((d) => (

@@ -22,6 +22,13 @@ const filters: { value: Filter; label: string }[] = [
 
 const frequencyLabel = { mensual: "Mensual", quincenal: "Quincenal", semanal: "Semanal" } as const;
 
+function formatTime12h(time24: string): string {
+  const [h, m] = time24.split(":").map(Number);
+  const period = h >= 12 ? "PM" : "AM";
+  const hour = h % 12 === 0 ? 12 : h % 12;
+  return `${hour}:${String(m).padStart(2, "0")} ${period}`;
+}
+
 export default function TransporteClient({ students }: { students: Student[] }) {
   const [filter, setFilter] = useState<Filter>("todos");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -210,7 +217,8 @@ export default function TransporteClient({ students }: { students: Student[] }) 
 
             <div className="rounded-2xl bg-white border border-dark/5 p-4 text-sm space-y-1.5">
               <p><span className="font-semibold">Dirección:</span> {selected.address}</p>
-              <p><span className="font-semibold">Horario:</span> {selected.schedule}</p>
+              <p><span className="font-semibold">Entrada:</span> {formatTime12h(selected.entryTime)}</p>
+              <p><span className="font-semibold">Salida:</span> {formatTime12h(selected.exitTime)}</p>
               <p><span className="font-semibold">Días:</span> {selected.days.join(" • ") || "—"}</p>
               <p><span className="font-semibold">Frecuencia:</span> {frequencyLabel[selected.frequency]}</p>
               <p>

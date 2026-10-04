@@ -85,6 +85,13 @@ export function ClientCard({ client, onClick }: { client: Client; onClick?: () =
 
 /* ---------- StudentCard ---------- */
 
+function formatTime12h(time24: string): string {
+  const [h, m] = time24.split(":").map(Number);
+  const period = h >= 12 ? "PM" : "AM";
+  const hour = h % 12 === 0 ? 12 : h % 12;
+  return `${hour}:${String(m).padStart(2, "0")} ${period}`;
+}
+
 export function StudentCard({ 
   student, 
   onPay, 
@@ -103,7 +110,9 @@ export function StudentCard({
           <div className="min-w-0">
             <p className="font-semibold truncate">{student.name}</p>
             <p className="text-sm text-dark/60 truncate">{student.school}</p>
-            <p className="text-xs text-dark/50 truncate">{student.frequency === 'semanal' ? 'Semanal' : student.frequency === 'quincenal' ? 'Quincenal' : 'Mensual'}</p>
+            <p className="text-xs text-dark/50 truncate">
+              {formatTime12h(student.entryTime)} – {formatTime12h(student.exitTime)}
+            </p>
           </div>
           {student.paid ? <Chip tone="teal">Pagado</Chip> : <Chip tone="danger">Pendiente</Chip>}
         </div>
