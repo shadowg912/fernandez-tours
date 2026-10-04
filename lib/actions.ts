@@ -7,18 +7,18 @@ import { ClientDraft, PaymentDraft, ServiceDraft, StudentDraft } from "@/lib/typ
 /* ---------- Estudiantes ---------- */
 export async function createStudent(d: StudentDraft) {
   await query(
-    `insert into students (name, school, address, schedule, days, monthly_fee, frequency, guardian, phone, paid)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-    [d.name, d.school, d.address, d.schedule, d.days, d.monthlyFee, d.frequency, d.guardian, d.phone, d.paid]
+    `insert into students (name, school, address, entry_time, exit_time, days, monthly_fee, frequency, guardian, phone, paid)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+    [d.name, d.school, d.address, d.entryTime, d.exitTime, d.days, d.monthlyFee, d.frequency, d.guardian, d.phone, d.paid]
   );
   revalidatePath("/transporte");
 }
 
 export async function updateStudent(id: string, d: StudentDraft) {
   await query(
-    `update students set name=$1, school=$2, address=$3, schedule=$4, days=$5, monthly_fee=$6,
-     frequency=$7, guardian=$8, phone=$9, paid=$10 where id=$11`,
-    [d.name, d.school, d.address, d.schedule, d.days, d.monthlyFee, d.frequency, d.guardian, d.phone, d.paid, id]
+    `update students set name=$1, school=$2, address=$3, entry_time=$4, exit_time=$5, days=$6, monthly_fee=$7,
+     frequency=$8, guardian=$9, phone=$10, paid=$11 where id=$12`,
+    [d.name, d.school, d.address, d.entryTime, d.exitTime, d.days, d.monthlyFee, d.frequency, d.guardian, d.phone, d.paid, id]
   );
   revalidatePath("/transporte");
 }
