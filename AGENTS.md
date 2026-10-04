@@ -1,3 +1,24 @@
+# Fernández Tours — Reglas del proyecto
+
+## 🔒 REGLA ESENCIAL — Base de datos
+
+1. Toda migración o cambio de esquema se prueba **PRIMERO** en la base de datos de develop (`fernandez-tours-develop`).
+2. **PROHIBIDO** ejecutar migraciones, seeds, o **cualquier escritura** en la base de datos de producción (Supabase, proyecto `obnivwnlerwuasvsigzc`) **sin autorización explícita del usuario en esa misma conversación**. La autorización debe pedirse siempre, aunque se haya autorizado antes. Solo lecturas simples de verificación están permitidas sin autorización, y preferiblemente también preguntar primero.
+3. **Nunca** commitear credenciales ni connection strings: solo se guardan en `.env.local` (ignorado por git).
+4. Los scripts de migración viven en `supabase/migrations/` y se aplican con:
+   - `npm run db:migrate:develop` — entorno de pruebas
+   - `npm run db:migrate:production` — requiere confirmación interactiva
+
+## Stack
+
+- Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS v4
+- Supabase CLI para migraciones (`npx supabase ...`)
+- Demo visual: la UI usa mock data en `lib/data.ts` mientras se conecta la base de datos.
+
+## Verificación obligatoria tras cambios
+
+`npx tsc --noEmit && npm run lint && npm run build`
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
