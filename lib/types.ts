@@ -51,3 +51,17 @@ export interface Payment {
   method: PaymentMethod;
   status: PaymentStatus;
 }
+
+export type StudentDraft = Omit<Student, "id">;
+export type ServiceDraft = Omit<Service, "id"> & { observations?: string };
+export type ClientDraft = Omit<Client, "id" | "lastService" | "balance">;
+export interface PaymentDraft {
+  clientName: string;
+  date: string;
+  concept: string;
+  amount: number;
+  method: PaymentMethod;
+  status: PaymentStatus;
+  period?: string;
+  observation?: string;
+}
