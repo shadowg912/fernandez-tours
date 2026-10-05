@@ -317,19 +317,32 @@ function StudentFormInner({
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    
+    // Validación cliente para campos obligatorios
+    const missing: string[] = [];
+    if (!name.trim()) missing.push("Nombre del estudiante");
+    if (!school.trim()) missing.push("Escuela / Colegio");
+    if (!monthlyFee || Number(monthlyFee) <= 0) missing.push("Tarifa (RD$)");
+    if (days.length === 0) missing.push("Días de transporte");
+    
+    if (missing.length > 0) {
+      alert(`Faltan campos obligatorios:\n• ${missing.join("\n• ")}`);
+      return;
+    }
+    
     setLoading(true);
     try {
       await onSaved({
         name: name.trim(),
         school: school.trim(),
-        address: address.trim(),
+        address: address.trim() || undefined,
         entryTime,
         exitTime,
         days,
         frequency,
         monthlyFee: Number(monthlyFee) || 0,
-        guardian: guardian.trim(),
-        phone: phone.trim(),
+        guardian: guardian.trim() || undefined,
+        phone: phone.trim() || undefined,
         paid: initial?.paid ?? false,
       });
     } finally {
@@ -347,7 +360,7 @@ function StudentFormInner({
           <Input value={school} onChange={(e) => setSchool(e.target.value)} placeholder="Ej. Colegio San José" required />
         </Field>
         <Field label="Dirección de recogida">
-          <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Sector, ciudad" required />
+          <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Sector, ciudad (opcional)" />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Hora de entrada">
@@ -386,10 +399,10 @@ function StudentFormInner({
           </Field>
         </div>
         <Field label="Representante">
-          <Input value={guardian} onChange={(e) => setGuardian(e.target.value)} placeholder="Padre / madre / encargado" required />
+          <Input value={guardian} onChange={(e) => setGuardian(e.target.value)} placeholder="Padre / madre / encargado (opcional)" />
         </Field>
         <Field label="Teléfono del representante">
-          <Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="809-555-0000" required />
+          <Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="809-555-0000 (opcional)" />
         </Field>
         <FormActions onCancel={onClose} loading={loading} label={initial ? "Guardar cambios" : "Agregar estudiante"} />
       </form>
