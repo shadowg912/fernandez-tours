@@ -29,15 +29,15 @@ export interface Student {
   id: string;
   name: string;
   school: string;
-  address: string;
-  entryTime: string; // HH:MM 24h
-  exitTime: string;  // HH:MM 24h
+  address?: string;       // opcional: dirección de recogida
+  entryTime: string;      // HH:MM 24h
+  exitTime: string;       // HH:MM 24h
   days: string[];
   monthlyFee: number;
   frequency: PayFrequency;
   paid: boolean;
-  guardian: string;
-  phone: string;
+  guardian?: string;      // opcional: representante
+  phone?: string;         // opcional: teléfono del representante
 }
 
 export type PaymentMethod = "efectivo" | "transferencia" | "tarjeta";
