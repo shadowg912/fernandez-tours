@@ -4,6 +4,8 @@ import { Client, Payment, PayFrequency, PaymentMethod, PaymentStatus, Service, S
  * Mapa de tablas de Supabase tipado con las interfaces del dominio.
  * Las columnas de cada tabla deben coincidir con estos Row types.
  */
+import { Route } from "./types";
+
 export interface Database {
   public: {
     Tables: {
@@ -11,6 +13,7 @@ export interface Database {
       services: Table<Service>;
       students: Table<Student>;
       payments: Table<Payment>;
+      routes: Table<Route>;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

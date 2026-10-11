@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { PayFrequency, PaymentMethod, ServiceStatus, Student, StudentDraft } from "@/lib/types";
+import { PayFrequency, PaymentMethod, Route, ServiceStatus, Student, StudentDraft } from "@/lib/types";
 import { Button, Field, Input, Modal, Select, Textarea } from "./ui";
 
 function FormActions({ onCancel, loading, label }: { onCancel: () => void; loading: boolean; label: string }) {
@@ -272,6 +272,92 @@ export function PaymentForm({
   );
 }
 
+/* ---------- CRUD Rutas ---------- */
+const routeColors = [
+  { value: "#16a34a", label: "Verde" },
+  { value: "#14b8a6", label: "Teal" },
+  { value: "#2563eb", label: "Azul" },
+  { value: "#9333ea", label: "Púrpura" },
+  { value: "#db2777", label: "Rosa" },
+  { value: "#ea580c", label: "Naranja" },
+  { value: "#ca8a04", label: "Amarillo" },
+];
+
+export function RouteForm({
+  open,
+  onClose,
+  onSaved,
+  initial,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSaved: (draft: { name: string; description?: string; color: string }) => void | Promise<void>;
+  initial?: Route | null;
+}) {
+  if (!open) return null;
+  return <RouteFormInner key={initial?.id ?? "new"} onClose={onClose} onSaved={onSaved} initial={initial ?? null} />;
+}
+
+function RouteFormInner({
+  onClose,
+  onSaved,
+  initial,
+}: {
+  onClose: () => void;
+  onSaved: (draft: { name: string; description?: string; color: string }) => void | Promise<void>;
+  initial: Route | null;
+}) {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [color, setColor] = useState(initial?.color ?? "#16a34a");
+
+  const { submit, loading: submitLoading } = useSubmit(async () => {
+    if (!name.trim()) {
+      alert("El nombre de la ruta es obligatorio");
+      return;
+    }
+    try {
+      await onSaved({
+        name: name.trim(),
+        description: description.trim() || undefined,
+        color,
+      });
+    } catch {
+      // Error handled by useSubmit
+    }
+  });
+
+  return (
+    <Modal open={true} onClose={onClose} title={initial ? "Editar ruta" : "Nueva ruta"}>
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="Nombre de la ruta">
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej. IPISA-IPIDBOSCO" required />
+        </Field>
+        <Field label="Descripción (opcional)">
+          <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Detalles de la ruta" />
+        </Field>
+        <Field label="Color">
+          <div className="flex flex-wrap gap-2">
+            {routeColors.map((c) => (
+              <button
+                key={c.value}
+                type="button"
+                onClick={() => setColor(c.value)}
+                className={`w-10 h-10 rounded-xl border-3 transition-all ${
+                  color === c.value ? "border-white ring-2 ring-offset-2 ring-teal scale-105" : "border-dark/10 hover:border-teal"
+                }`}
+                style={{ backgroundColor: c.value }}
+                title={c.label}
+              />
+            ))}
+          </div>
+        </Field>
+        <FormActions onCancel={onClose} loading={submitLoading} label={initial ? "Guardar cambios" : "Crear ruta"} />
+      </form>
+    </Modal>
+  );
+}
+
 /* ---------- CRUD Estudiantes ---------- */
 const allDays = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
@@ -280,25 +366,29 @@ export function StudentForm({
   onClose,
   onSaved,
   initial,
+  routes = [],
 }: {
   open: boolean;
   onClose: () => void;
   onSaved: (draft: StudentDraft) => void | Promise<void>;
   initial?: Student | null;
+  routes?: Route[];
 }) {
   if (!open) return null;
   // key fuerza remount: el estado se inicializa desde `initial` sin efectos
-  return <StudentFormInner key={initial?.id ?? "new"} onClose={onClose} onSaved={onSaved} initial={initial ?? null} />;
+  return <StudentFormInner key={initial?.id ?? "new"} onClose={onClose} onSaved={onSaved} initial={initial ?? null} routes={routes} />;
 }
 
 function StudentFormInner({
   onClose,
   onSaved,
   initial,
+  routes = [],
 }: {
   onClose: () => void;
   onSaved: (draft: StudentDraft) => void | Promise<void>;
   initial: Student | null;
+  routes?: Route[];
 }) {
   const [name, setName] = useState(initial?.name ?? "");
   const [school, setSchool] = useState(initial?.school ?? "");
@@ -310,6 +400,7 @@ function StudentFormInner({
   const [monthlyFee, setMonthlyFee] = useState(initial ? String(initial.monthlyFee) : "");
   const [guardian, setGuardian] = useState(initial?.guardian ?? "");
   const [phone, setPhone] = useState(initial?.phone ?? "");
+  const [routeId, setRouteId] = useState(initial?.routeId ?? "");
   const [loading, setLoading] = useState(false);
 
   const toggleDay = (d: string) =>
@@ -321,7 +412,6 @@ function StudentFormInner({
     // Validación cliente para campos obligatorios
     const missing: string[] = [];
     if (!name.trim()) missing.push("Nombre del estudiante");
-    if (!school.trim()) missing.push("Escuela / Colegio");
     if (!monthlyFee || Number(monthlyFee) <= 0) missing.push("Tarifa (RD$)");
     if (days.length === 0) missing.push("Días de transporte");
     
@@ -334,7 +424,7 @@ function StudentFormInner({
     try {
       await onSaved({
         name: name.trim(),
-        school: school.trim(),
+        school: school.trim() || undefined,
         address: address.trim() || undefined,
         entryTime,
         exitTime,
@@ -343,6 +433,7 @@ function StudentFormInner({
         monthlyFee: Number(monthlyFee) || 0,
         guardian: guardian.trim() || undefined,
         phone: phone.trim() || undefined,
+        routeId: routeId || undefined,
         paid: initial?.paid ?? false,
       });
     } finally {
@@ -356,11 +447,19 @@ function StudentFormInner({
         <Field label="Nombre del estudiante">
           <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej. Carlos Martínez Jr." required />
         </Field>
-        <Field label="Escuela / Colegio">
-          <Input value={school} onChange={(e) => setSchool(e.target.value)} placeholder="Ej. Colegio San José" required />
+        <Field label="Escuela / Colegio (opcional)">
+          <Input value={school} onChange={(e) => setSchool(e.target.value)} placeholder="Ej. Colegio San José" />
         </Field>
         <Field label="Dirección de recogida">
           <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Sector, ciudad (opcional)" />
+        </Field>
+        <Field label="Ruta">
+          <Select value={routeId} onChange={(e) => setRouteId(e.target.value)}>
+            <option value="">— Sin ruta —</option>
+            {routes.map((r) => (
+              <option key={r.id} value={r.id}>{r.name}</option>
+            ))}
+          </Select>
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Hora de entrada">

@@ -3,7 +3,7 @@
 import { Client, Payment, Service, Student } from "@/lib/types";
 import { formatDateShort } from "@/lib/format";
 import { Avatar, Card, Chip, Money, StatusBadge } from "./ui";
-import { IconMoney, IconPhone, IconCheck } from "./icons";
+import { IconPhone } from "./icons";
 
 /* ---------- SummaryCard ---------- */
 export function SummaryCard({ value, label, accent = false }: { value: string; label: string; accent?: boolean }) {
@@ -94,12 +94,10 @@ function formatTime12h(time24: string): string {
 
 export function StudentCard({ 
   student, 
-  onPay, 
   onClick, 
   onQuickPay 
 }: { 
   student: Student; 
-  onPay?: () => void; 
   onClick?: () => void;
   onQuickPay?: () => void;
 }) {
@@ -109,43 +107,48 @@ export function StudentCard({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="font-semibold truncate">{student.name}</p>
-            <p className="text-sm text-dark/60 truncate">{student.school}</p>
+            {student.school && (
+              <p className="text-sm text-dark/60 truncate">{student.school}</p>
+            )}
             <p className="text-xs text-dark/50 truncate">
               {formatTime12h(student.entryTime)} – {formatTime12h(student.exitTime)}
             </p>
           </div>
           {student.paid ? <Chip tone="teal">Pagado</Chip> : <Chip tone="danger">Pendiente</Chip>}
         </div>
-        {!student.paid && (onPay || onQuickPay) && (
-          <div className="mt-3 flex items-center justify-end gap-2">
-            {onQuickPay && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  onQuickPay();
-                }}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-gold px-3 py-2 text-xs font-bold text-white shadow-sm transition-all hover:bg-light-gold hover:text-dark active:scale-[.97]"
-                title="Pago rápido (efectivo, hoy)"
-              >
-                <IconCheck className="h-3.5 w-3.5" />
-                Pago rápido
-              </button>
-            )}
-            {onPay && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  onPay();
-                }}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-teal px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-all hover:bg-dark-teal active:scale-[.97]"
-              >
-                <IconMoney className="h-4 w-4" />
-                Registrar pago
-              </button>
-            )}
-          </div>
+        {!student.paid && onQuickPay && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onQuickPay();
+            }}
+            className="mt-3 w-full rounded-xl px-4 py-6 text-base font-bold text-white shadow-sm transition-all active:scale-[.98] focus:outline-none focus:ring-2"
+            style={{
+              backgroundColor: "#16a34a",
+              color: "#ffffff",
+              boxShadow: "0 2px 8px rgba(22, 163, 74, 0.35)",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "#15803d";
+              e.currentTarget.style.boxShadow = "0 4px 14px rgba(22, 163, 74, 0.45)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "#16a34a";
+              e.currentTarget.style.boxShadow = "0 2px 8px rgba(22, 163, 74, 0.35)";
+            }}
+            onMouseDown={(e) => {
+              e.currentTarget.style.backgroundColor = "#166534";
+            }}
+            title="Registrar pago (efectivo, hoy)"
+          >
+            <div className="flex items-center justify-center gap-2">
+              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 12l5 5L20 7" />
+              </svg>
+              <span>Pago</span>
+            </div>
+          </button>
         )}
       </Card>
     </div>
