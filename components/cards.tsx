@@ -85,12 +85,16 @@ export function ClientCard({ client, onClick }: { client: Client; onClick?: () =
 
 /* ---------- StudentCard ---------- */
 
+import { formatMoney } from "@/lib/format";
+
 function formatTime12h(time24: string): string {
   const [h, m] = time24.split(":").map(Number);
   const period = h >= 12 ? "PM" : "AM";
   const hour = h % 12 === 0 ? 12 : h % 12;
   return `${hour}:${String(m).padStart(2, "0")} ${period}`;
 }
+
+const frequencyLabel = { mensual: "Mensual", quincenal: "Quincenal", semanal: "Semanal" } as const;
 
 export function StudentCard({ 
   student, 
@@ -103,53 +107,59 @@ export function StudentCard({
 }) {
   return (
     <div onClick={onClick} className="cursor-pointer">
-      <Card className="p-4 hover:border-teal/40 hover:shadow-md transition-all">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="font-semibold truncate">{student.name}</p>
-            {student.school && (
-              <p className="text-sm text-dark/60 truncate">{student.school}</p>
-            )}
-            <p className="text-xs text-dark/50 truncate">
-              {formatTime12h(student.entryTime)} – {formatTime12h(student.exitTime)}
-            </p>
-          </div>
-          {student.paid ? <Chip tone="teal">Pagado</Chip> : <Chip tone="danger">Pendiente</Chip>}
-        </div>
-        {!student.paid && onQuickPay && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              onQuickPay();
-            }}
-            className="mt-3 w-full rounded-xl px-4 py-6 text-base font-bold text-white shadow-sm transition-all active:scale-[.98] focus:outline-none focus:ring-2"
-            style={{
-              backgroundColor: "#16a34a",
-              color: "#ffffff",
-              boxShadow: "0 2px 8px rgba(22, 163, 74, 0.35)",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#15803d";
-              e.currentTarget.style.boxShadow = "0 4px 14px rgba(22, 163, 74, 0.45)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "#16a34a";
-              e.currentTarget.style.boxShadow = "0 2px 8px rgba(22, 163, 74, 0.35)";
-            }}
-            onMouseDown={(e) => {
-              e.currentTarget.style.backgroundColor = "#166534";
-            }}
-            title="Registrar pago (efectivo, hoy)"
-          >
-            <div className="flex items-center justify-center gap-2">
-              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 12l5 5L20 7" />
-              </svg>
-              <span>Pago</span>
+      <Card className="p-0 overflow-hidden hover:border-teal/40 hover:shadow-md transition-all">
+        <div className="grid grid-cols-[3fr_2fr] min-h-[128px]">
+          {/* Izquierda: info estudiante (3/5) */}
+          <div className="p-4 flex flex-col justify-between min-w-0">
+            <div className="min-w-0">
+              <p className="font-semibold truncate">{student.name}</p>
+              {student.school && (
+                <p className="mt-1 text-sm text-dark/60 truncate">{student.school}</p>
+              )}
+              <p className="mt-1 text-xs text-dark/50 truncate">
+                {formatTime12h(student.entryTime)} – {formatTime12h(student.exitTime)}
+              </p>
+              {/* Pago y periodicidad */}
+              <div className="mt-2 flex items-center gap-3 text-xs text-dark/60">
+                <span className="flex items-center gap-1 font-medium text-dark-teal">
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {formatMoney(student.monthlyFee)}
+                </span>
+                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-dark/5">
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {frequencyLabel[student.frequency]}
+                </span>
+              </div>
             </div>
-          </button>
-        )}
+            <div className="mt-3 flex items-center">
+              {student.paid ? <Chip tone="teal">Pagado</Chip> : <Chip tone="danger">Pendiente</Chip>}
+            </div>
+          </div>
+
+          {/* Derecha: botón Pago (2/5) - solo si no pagado */}
+          {!student.paid && onQuickPay && (
+            <div className="flex items-center justify-center p-3">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  onQuickPay();
+                }}
+                className="w-full h-full max-w-[120px] rounded-xl bg-green-600 text-white font-bold text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-white hover:bg-green-700 active:bg-green-800 flex items-center justify-center gap-2 px-4"
+                title="Registrar pago (efectivo, hoy)"
+              >
+                <svg className="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 12l5 5L20 7" />
+                </svg>
+                <span className="whitespace-nowrap">Pago</span>
+              </button>
+            </div>
+          )}
+        </div>
       </Card>
     </div>
   );
