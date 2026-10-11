@@ -124,6 +124,15 @@ export function IconPhone(props: IconProps) {
   );
 }
 
+export function IconRoute(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+    </svg>
+  );
+}
+
 export function IconCheck(props: IconProps) {
   return (
     <svg {...base(props)}>

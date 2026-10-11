@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Student, StudentDraft } from "@/lib/types";
+import { Route, Student, StudentDraft } from "@/lib/types";
 import { formatMoney } from "@/lib/format";
-import { createStudent, deleteStudent, markStudentPaid, updateStudent, quickPayStudent } from "@/lib/actions";
+import { createRoute, updateRoute, createStudent, deleteStudent, markStudentPaid, updateStudent, quickPayStudent } from "@/lib/actions";
 import { StudentCard, SummaryCard } from "@/components/cards";
 import { Avatar, Button, Chip, EmptyState, Modal, Toast } from "@/components/ui";
-import { ConfirmDialog, PaymentForm, StudentForm } from "@/components/forms";
-import { IconCheck, IconPhone, IconPlus } from "@/components/icons";
+import { ConfirmDialog, PaymentForm, RouteForm, StudentForm } from "@/components/forms";
+import { IconCheck, IconPhone, IconPlus, IconRoute } from "@/components/icons";
 
 type Filter = "todos" | "pagado" | "pendiente" | "mensual" | "quincenal" | "semanal";
 
@@ -29,15 +29,31 @@ function formatTime12h(time24: string): string {
   return `${hour}:${String(m).padStart(2, "0")} ${period}`;
 }
 
-export default function TransporteClient({ students }: { students: Student[] }) {
-  const [filter, setFilter] = useState<Filter>("todos");
+export default function TransporteClient({ 
+  students: initialStudents, 
+  routes: initialRoutes 
+}: { 
+  students: Student[]; 
+  routes: Route[];
+}) {
+  const [filter, setFilter] = useState<Filter>("pendiente");
+  const [selectedRouteId, setSelectedRouteId] = useState<string>(""); // "" = todas
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [routeFormOpen, setRouteFormOpen] = useState(false);
+  const [editingRoute, setEditingRoute] = useState<Route | null>(null);
   const [editing, setEditing] = useState<Student | null>(null);
   const [deleting, setDeleting] = useState<Student | null>(null);
   const [payStudent, setPayStudent] = useState<Student | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const [students, setStudents] = useState(initialStudents);
+  const [routes, setRoutes] = useState(initialRoutes);
+
+  // Sincronizar con props si cambian (evita setState directo en effect warning)
+  if (students !== initialStudents) setStudents(initialStudents);
+  if (routes !== initialRoutes) setRoutes(initialRoutes);
 
   useEffect(() => {
     if (!toast) return;
@@ -50,6 +66,9 @@ export default function TransporteClient({ students }: { students: Student[] }) 
   const collected = students.filter((s) => s.paid).reduce((sum, s) => sum + s.monthlyFee, 0);
 
   const filtered = students.filter((s) => {
+    // Filtro por ruta
+    if (selectedRouteId && s.routeId !== selectedRouteId) return false;
+    // Filtro por estado/frecuencia
     if (filter === "todos") return true;
     if (filter === "pagado") return s.paid;
     if (filter === "pendiente") return !s.paid;
@@ -57,6 +76,7 @@ export default function TransporteClient({ students }: { students: Student[] }) 
   });
 
   const selected = students.find((s) => s.id === selectedId) ?? null;
+  const selectedRoute = routes.find((r) => r.id === selectedRouteId) ?? null;
 
   const run = (fn: () => Promise<void>, message: string) => {
     startTransition(async () => {
@@ -93,16 +113,36 @@ export default function TransporteClient({ students }: { students: Student[] }) 
       await quickPayStudent(student.id);
     }, `Pago rápido registrado para ${student.name}`);
 
+  const onCreateRoute = (draft: { name: string; description?: string; color: string }) =>
+    run(async () => {
+      await createRoute(draft);
+      setRouteFormOpen(false);
+      setEditingRoute(null);
+    }, "Ruta creada");
+
+  const onUpdateRoute = (draft: { name: string; description?: string; color: string }) => {
+    if (!editingRoute) return;
+    run(async () => {
+      await updateRoute(editingRoute.id, draft);
+      setEditingRoute(null);
+    }, "Ruta actualizada");
+  };
+
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold">Transporte estudiantil</h1>
           <p className="text-sm text-dark/60">Gestionado en tiempo real</p>
         </div>
-        <Button onClick={() => setFormOpen(true)}>
-          <IconPlus className="h-5 w-5" /> <span className="hidden sm:inline">Nuevo estudiante</span><span className="sm:hidden">Nuevo</span>
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => setRouteFormOpen(true)}>
+            <IconRoute className="h-5 w-5" /> <span className="hidden sm:inline">Nueva ruta</span><span className="sm:hidden">Ruta</span>
+          </Button>
+          <Button onClick={() => setFormOpen(true)}>
+            <IconPlus className="h-5 w-5" /> <span className="hidden sm:inline">Nuevo estudiante</span><span className="sm:hidden">Nuevo</span>
+          </Button>
+        </div>
       </div>
 
       <section className="flex flex-wrap gap-3">
@@ -111,22 +151,50 @@ export default function TransporteClient({ students }: { students: Student[] }) 
         <SummaryCard value={formatMoney(total - collected)} label="Pendiente" accent />
       </section>
 
-      {/* Filtros */}
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
-        {filters.map((f) => (
-          <button
-            key={f.value}
-            onClick={() => setFilter(f.value)}
-            className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-              filter === f.value ? "bg-teal text-white" : "bg-white text-dark/70 border border-dark/10 hover:border-teal"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+      {/* Selector de ruta + Filtros */}
+      <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+        {/* Dropdown de ruta - full width en móvil, auto en desktop */}
+        <div className="w-full sm:w-auto">
+          <label className="sr-only">Seleccionar ruta</label>
+          <div className="relative">
+            <select
+              value={selectedRouteId}
+              onChange={(e) => setSelectedRouteId(e.target.value)}
+              className="appearance-none w-full rounded-xl border border-dark/15 bg-white px-4 py-3 pr-10 text-base sm:text-sm focus:border-teal focus:ring-2 focus:ring-teal/20 cursor-pointer transition-all hover:border-teal/50 min-h-[48px]"
+              style={{
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b' stroke-width='1.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5'/%3E%3C/svg%3E")`,
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'right 12px center',
+                backgroundSize: '20px',
+              }}
+            >
+              <option value="">Todas las rutas</option>
+              {routes.map((r) => (
+                <option key={r.id} value={r.id}>{r.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Filtros - scroll horizontal en móvil, inline en desktop */}
+        <div className="w-full sm:w-auto flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
+          {filters.map((f) => (
+            <button
+              key={f.value}
+              onClick={() => setFilter(f.value)}
+              className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-medium transition-all min-h-[44px] ${
+                filter === f.value 
+                  ? "bg-teal text-white shadow-sm" 
+                  : "bg-white text-dark/70 border border-dark/10 hover:border-teal hover:bg-teal/5"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {pendingStudents.length > 0 && filter === "todos" && (
+      {pendingStudents.length > 0 && (filter === "todos" || filter === "pendiente") && selectedRouteId === "" && (
         <section>
           <h2 className="mb-3 text-lg font-bold">Pagos pendientes</h2>
           <div className="space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0">
@@ -134,7 +202,6 @@ export default function TransporteClient({ students }: { students: Student[] }) 
               <StudentCard 
                 key={s.id} 
                 student={s} 
-                onPay={() => setPayStudent(s)} 
                 onClick={() => setSelectedId(s.id)}
                 onQuickPay={() => onQuickPay(s)}
               />
@@ -145,12 +212,18 @@ export default function TransporteClient({ students }: { students: Student[] }) 
 
       <section>
         <h2 className="mb-3 text-lg font-bold">
-          {filter === "todos" ? "Todos los estudiantes" : filters.find((f) => f.value === filter)?.label}
+          {selectedRouteId ? selectedRoute?.name : filter === "todos" ? "Todos los estudiantes" : filters.find((f) => f.value === filter)?.label}
         </h2>
         {filtered.length === 0 ? (
           <EmptyState
             title="No hay estudiantes"
-            message={filter === "todos" ? "Agrega tu primer estudiante con el botón de arriba." : "Ningún estudiante coincide con este filtro."}
+            message={
+              selectedRouteId
+                ? `No hay estudiantes en la ruta "${selectedRoute?.name}".`
+                : filter === "todos"
+                ? "Agrega tu primer estudiante con el botón de arriba."
+                : "Ningún estudiante coincide con este filtro."
+            }
           />
         ) : (
           <div className="space-y-3 md:grid md:grid-cols-2 xl:grid-cols-3 md:gap-3 md:space-y-0">
@@ -158,7 +231,6 @@ export default function TransporteClient({ students }: { students: Student[] }) 
               <StudentCard 
                 key={s.id} 
                 student={s} 
-                onPay={() => setPayStudent(s)} 
                 onClick={() => setSelectedId(s.id)}
                 onQuickPay={() => onQuickPay(s)}
               />
@@ -167,13 +239,24 @@ export default function TransporteClient({ students }: { students: Student[] }) 
         )}
       </section>
 
-      {/* Crear */}
-      <StudentForm open={formOpen} onClose={() => setFormOpen(false)} onSaved={onCreate} />
+      {/* Crear estudiante */}
+      <StudentForm 
+        open={formOpen} 
+        onClose={() => setFormOpen(false)} 
+        onSaved={onCreate} 
+        routes={routes}
+      />
 
-      {/* Editar */}
-      <StudentForm open={editing !== null} onClose={() => setEditing(null)} onSaved={onUpdate} initial={editing} />
+      {/* Editar estudiante */}
+      <StudentForm 
+        open={editing !== null} 
+        onClose={() => setEditing(null)} 
+        onSaved={onUpdate} 
+        initial={editing}
+        routes={routes}
+      />
 
-      {/* Eliminar */}
+      {/* Eliminar estudiante */}
       <ConfirmDialog
         open={deleting !== null}
         onClose={() => setDeleting(null)}
@@ -202,7 +285,15 @@ export default function TransporteClient({ students }: { students: Student[] }) 
         }}
       />
 
-      {/* Detalle */}
+      {/* Crear/Editar ruta */}
+      <RouteForm
+        open={routeFormOpen || editingRoute !== null}
+        onClose={() => { setRouteFormOpen(false); setEditingRoute(null); }}
+        onSaved={editingRoute ? onUpdateRoute : onCreateRoute}
+        initial={editingRoute}
+      />
+
+      {/* Detalle estudiante */}
       <Modal open={selected !== null} onClose={() => setSelectedId(null)} title="Detalle del estudiante">
         {selected && (
           <div className="space-y-4">
@@ -210,13 +301,19 @@ export default function TransporteClient({ students }: { students: Student[] }) 
               <Avatar name={selected.name} size="lg" />
               <div>
                 <p className="text-lg font-bold leading-tight">{selected.name}</p>
-                <p className="text-sm text-dark/60">{selected.school}</p>
+                {selected.school && <p className="text-sm text-dark/60">{selected.school}</p>}
+                {selected.route && (
+                  <span className="inline-flex items-center gap-1 mt-1 text-xs font-medium" style={{ color: selected.route.color }}>
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: selected.route.color }}></span>
+                    {selected.route.name}
+                  </span>
+                )}
                 {selected.paid ? <Chip tone="teal">Pagado</Chip> : <Chip tone="danger">Pendiente</Chip>}
               </div>
             </div>
 
             <div className="rounded-2xl bg-white border border-dark/5 p-4 text-sm space-y-1.5">
-              <p><span className="font-semibold">Dirección:</span> {selected.address}</p>
+              <p><span className="font-semibold">Dirección:</span> {selected.address || "—"}</p>
               <p><span className="font-semibold">Entrada:</span> {formatTime12h(selected.entryTime)}</p>
               <p><span className="font-semibold">Salida:</span> {formatTime12h(selected.exitTime)}</p>
               <p><span className="font-semibold">Días:</span> {selected.days.join(" • ") || "—"}</p>
@@ -225,9 +322,9 @@ export default function TransporteClient({ students }: { students: Student[] }) 
                 <span className="font-semibold">Tarifa:</span>{" "}
                 <span className="text-gold-deep font-bold">{formatMoney(selected.monthlyFee)}</span>
               </p>
-              <p><span className="font-semibold">Representante:</span> {selected.guardian}</p>
+              <p><span className="font-semibold">Representante:</span> {selected.guardian || "—"}</p>
               <p className="flex items-center gap-1.5">
-                <IconPhone className="h-4 w-4 text-dark/40" /> {selected.phone}
+                <IconPhone className="h-4 w-4 text-dark/40" /> {selected.phone || "—"}
               </p>
             </div>
 

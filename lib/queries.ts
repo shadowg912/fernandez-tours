@@ -1,6 +1,6 @@
 import "server-only";
 import { query } from "./db";
-import { Client, Payment, Service, ServiceStatus, Student } from "./types";
+import { Client, Payment, Route, Service, ServiceStatus, Student } from "./types";
 
 type Row = Record<string, unknown>;
 
@@ -40,7 +40,7 @@ function mapStudent(r: Row): Student {
   return {
     id: String(r.id),
     name: String(r.name),
-    school: String(r.school),
+    school: r.school == null ? undefined : String(r.school),
     address: String(r.address),
     entryTime: String(r.entry_time).slice(0, 5),
     exitTime: String(r.exit_time).slice(0, 5),
@@ -50,6 +50,16 @@ function mapStudent(r: Row): Student {
     paid: Boolean(r.paid),
     guardian: String(r.guardian),
     phone: String(r.phone),
+    routeId: r.route_id == null ? undefined : String(r.route_id),
+  };
+}
+
+function mapRoute(r: Row): Route {
+  return {
+    id: String(r.id),
+    name: String(r.name),
+    description: r.description == null ? undefined : String(r.description),
+    color: String(r.color),
   };
 }
 
@@ -109,4 +119,9 @@ export async function getDashboardData(): Promise<DashboardData> {
   );
 
   return { today, todayServices, upcomingCount, clientsCount, pendingMoney };
+}
+
+export async function getRoutes(): Promise<Route[]> {
+  const rows = await query("select * from routes order by name");
+  return rows.map(mapRoute);
 }

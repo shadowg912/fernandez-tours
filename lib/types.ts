@@ -25,10 +25,17 @@ export interface Client {
 
 export type PayFrequency = "mensual" | "quincenal" | "semanal";
 
+export interface Route {
+  id: string;
+  name: string;
+  description?: string;
+  color: string;
+}
+
 export interface Student {
   id: string;
   name: string;
-  school: string;
+  school?: string;        // opcional: escuela/colegio
   address?: string;       // opcional: dirección de recogida
   entryTime: string;      // HH:MM 24h
   exitTime: string;       // HH:MM 24h
@@ -38,6 +45,8 @@ export interface Student {
   paid: boolean;
   guardian?: string;      // opcional: representante
   phone?: string;         // opcional: teléfono del representante
+  routeId?: string;       // FK a routes
+  route?: Route;          // para joins/populate
 }
 
 export type PaymentMethod = "efectivo" | "transferencia" | "tarjeta";

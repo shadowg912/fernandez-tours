@@ -2,14 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { query } from "@/lib/db";
-import { ClientDraft, PaymentDraft, ServiceDraft, StudentDraft } from "@/lib/types";
+import { ClientDraft, PaymentDraft, Route, ServiceDraft, StudentDraft } from "@/lib/types";
 
 /* ---------- Estudiantes ---------- */
 export async function createStudent(d: StudentDraft) {
   await query(
-    `insert into students (name, school, address, entry_time, exit_time, days, monthly_fee, frequency, guardian, phone, paid)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-    [d.name, d.school, d.address ?? null, d.entryTime, d.exitTime, d.days, d.monthlyFee, d.frequency, d.guardian ?? null, d.phone ?? null, d.paid]
+    `insert into students (name, school, address, entry_time, exit_time, days, monthly_fee, frequency, guardian, phone, paid, route_id)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+    [d.name, d.school ?? null, d.address ?? null, d.entryTime, d.exitTime, d.days, d.monthlyFee, d.frequency, d.guardian ?? null, d.phone ?? null, d.paid, d.routeId ?? null]
   );
   revalidatePath("/transporte");
 }
@@ -17,8 +17,8 @@ export async function createStudent(d: StudentDraft) {
 export async function updateStudent(id: string, d: StudentDraft) {
   await query(
     `update students set name=$1, school=$2, address=$3, entry_time=$4, exit_time=$5, days=$6, monthly_fee=$7,
-     frequency=$8, guardian=$9, phone=$10, paid=$11 where id=$12`,
-    [d.name, d.school, d.address ?? null, d.entryTime, d.exitTime, d.days, d.monthlyFee, d.frequency, d.guardian ?? null, d.phone ?? null, d.paid, id]
+     frequency=$8, guardian=$9, phone=$10, paid=$11, route_id=$12 where id=$13`,
+    [d.name, d.school ?? null, d.address ?? null, d.entryTime, d.exitTime, d.days, d.monthlyFee, d.frequency, d.guardian ?? null, d.phone ?? null, d.paid, d.routeId ?? null, id]
   );
   revalidatePath("/transporte");
 }
@@ -100,4 +100,31 @@ export async function createPayment(d: PaymentDraft) {
   );
   revalidatePath("/pagos");
   revalidatePath("/");
+}
+
+/* ---------- Rutas ---------- */
+export async function createRoute(d: Omit<Route, "id">) {
+  await query(
+    `insert into routes (name, description, color) values ($1,$2,$3)`,
+    [d.name, d.description ?? null, d.color]
+  );
+  revalidatePath("/transporte");
+}
+
+export async function updateRoute(id: string, d: Partial<Omit<Route, "id">>) {
+  const sets: string[] = [];
+  const vals: unknown[] = [];
+  let idx = 1;
+  if (d.name !== undefined) { sets.push(`name=$${idx++}`); vals.push(d.name); }
+  if (d.description !== undefined) { sets.push(`description=$${idx++}`); vals.push(d.description); }
+  if (d.color !== undefined) { sets.push(`color=$${idx++}`); vals.push(d.color); }
+  if (sets.length === 0) return;
+  vals.push(id);
+  await query(`update routes set ${sets.join(", ")} where id=$${idx}`, vals);
+  revalidatePath("/transporte");
+}
+
+export async function deleteRoute(id: string) {
+  await query("delete from routes where id=$1", [id]);
+  revalidatePath("/transporte");
 }
