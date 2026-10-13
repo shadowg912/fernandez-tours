@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReactNode } from "react";
-import { IconBus, IconCalendar, IconHome, IconMenu, IconMoney, IconUsers } from "./icons";
+import { IconBus, IconCalendar, IconHome, IconMenu, IconMoney, IconRoute, IconUsers } from "./icons";
 
 const navItems = [
   { href: "/", label: "Inicio", icon: IconHome },
+  { href: "/rutas", label: "Rutas", icon: IconRoute },
   { href: "/servicios", label: "Servicios", icon: IconBus },
-  { href: "/clientes", label: "Clientes", icon: IconUsers },
   { href: "/transporte", label: "Estudiantes", icon: IconUsers },
   { href: "/pagos", label: "Pagos", icon: IconMoney },
   { href: "/agenda", label: "Agenda", icon: IconCalendar },
@@ -17,10 +17,10 @@ const navItems = [
 
 const bottomItems = [
   { href: "/", label: "Inicio", icon: IconHome },
+  { href: "/rutas", label: "Rutas", icon: IconRoute },
   { href: "/servicios", label: "Servicios", icon: IconBus },
-  { href: "/clientes", label: "Clientes", icon: IconUsers },
+  { href: "/transporte", label: "Estudiantes", icon: IconUsers },
   { href: "/pagos", label: "Pagos", icon: IconMoney },
-  { href: "/mas", label: "Más", icon: IconMenu },
 ];
 
 export default function NavShell({ children }: { children: ReactNode }) {

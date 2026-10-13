@@ -62,6 +62,33 @@ export interface Payment {
   status: PaymentStatus;
 }
 
+export type ExecutionStatus = "pending" | "done" | "skipped";
+
+export interface DailyRoute {
+  id: string;
+  name: string;
+  dailyFee: number;
+  daysOfWeek: string[];  // ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+  generationWindowDays: number;  // default 60
+}
+
+export interface RouteExecution {
+  id: string;
+  routeId: string;
+  executionDate: string;
+  status: ExecutionStatus;
+  amountCollected: number;
+}
+
+export type DailyRouteDraft = Omit<DailyRoute, "id">;
+
+export interface DailyRouteWithExecutions extends DailyRoute {
+  executions: RouteExecution[];
+  totalCollected: number;
+  totalPending: number;
+  totalSkipped: number;
+}
+
 export type StudentDraft = Omit<Student, "id">;
 export type ServiceDraft = Omit<Service, "id"> & { observations?: string };
 export type ClientDraft = Omit<Client, "id" | "lastService" | "balance">;
