@@ -42,7 +42,9 @@ export async function updateDailyRoute(id: string, d: Partial<DailyRouteDraft>) 
   vals.push(id);
   await query(`update daily_routes set ${sets.join(", ")} where id=$${idx}`, vals);
   
+  // Regenerar TODAS las fechas si cambiaron días o ventana
   if (d.daysOfWeek !== undefined || d.generationWindowDays !== undefined) {
+    await query("delete from route_executions where route_id=$1", [id]);
     await query("select generate_route_executions($1)", [id]);
   }
   revalidatePath("/rutas");
@@ -62,11 +64,14 @@ export async function toggleExecutionStatus(routeId: string, executionDate: stri
   
   const amount = newStatus === "done" ? dailyFee : 0;
   
+  // Upsert: insert if not exists, update if exists
   await query(
-    `update route_executions 
-     set status = $1, amount_collected = $2
-     where route_id = $3 and execution_date = $4`,
-    [newStatus, amount, routeId, executionDate]
+    `insert into route_executions (route_id, execution_date, status, amount_collected)
+     values ($1, $2, $3, $4)
+     on conflict (route_id, execution_date) do update set 
+       status = $3,
+       amount_collected = $4`,
+    [routeId, executionDate, newStatus, amount]
   );
   revalidatePath("/rutas");
 }

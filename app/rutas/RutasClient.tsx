@@ -6,7 +6,7 @@ import { formatMoney } from "@/lib/format";
 import { DailyRouteCard, SummaryCard } from "@/components/cards";
 import { Button, EmptyState, Modal, Toast } from "@/components/ui";
 import { DailyRouteForm, ConfirmDialog } from "@/components/forms";
-import { IconPlus, IconChevronLeft, IconChevronRight, IconCopy, IconSearch } from "@/components/icons";
+import { IconPlus, IconCopy, IconSearch } from "@/components/icons";
 import { 
   createDailyRoute, 
   updateDailyRoute, 
@@ -45,11 +45,8 @@ export default function RutasClient({
   const [toast, setToast] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [globalTodayStats, setGlobalTodayStats] = useState<{ completed: number; collected: number; pending: number; skipped: number } | null>(null);
-
-  // Date list state
-  const [currentPage, setCurrentPage] = useState(0);
-  const [searchQuery, setSearchQuery] = useState("");
   const [showAll, setShowAll] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Sincronizar con props si cambian
   if (routes !== initialRoutes) setRoutes(initialRoutes);
@@ -140,7 +137,7 @@ export default function RutasClient({
     }, "Estado actualizado");
   };
 
-  // Group executions by month (descending order)
+  // Group executions by month (ascending order)
   const monthGroups = useMemo(() => {
     if (!selectedRoute) return [];
     
@@ -178,24 +175,11 @@ export default function RutasClient({
       groups[monthKey].push(e);
     });
     
-    // Convert to array and sort descending
+    // Convert to array and sort ascending
     return Object.entries(groups)
       .map(([month, items]) => ({ month, items }))
       .sort((a, b) => a.month.localeCompare(b.month));
   }, [executions, selectedRoute, showAll, searchQuery]);
-
-  // Pagination
-  const totalPages = monthGroups.length;
-  const canGoPrev = currentPage > 0;
-  const canGoNext = currentPage < totalPages - 1;
-
-  const goToPrevMonth = () => {
-    if (canGoPrev) setCurrentPage(p => p - 1);
-  };
-
-  const goToNextMonth = () => {
-    if (canGoNext) setCurrentPage(p => p + 1);
-  };
 
   const getMonthLabel = (monthKey: string) => {
     const [y, m] = monthKey.split("-").map(Number);
@@ -243,7 +227,6 @@ export default function RutasClient({
                 route={route}
                 onClick={() => {
                   setSelectedRoute(route);
-                  setCurrentPage(0);
                   loadExecutions(route.id);
                 }}
                 onEdit={() => setEditingRoute(route)}
@@ -259,22 +242,6 @@ export default function RutasClient({
       {selectedRoute && (
         <Modal open={true} onClose={() => setSelectedRoute(null)} title="Detalle de ruta">
           <div className="space-y-4">
-            {/* Resumen general */}
-            <div className="flex gap-4 p-4 bg-white rounded-xl border border-dark/5">
-              <div className="flex-1 text-center">
-                <p className="text-2xl font-bold text-dark-teal">{formatMoney(executions.filter(e => e.status === "done").reduce((s, e) => s + e.amountCollected, 0))}</p>
-                <p className="text-xs text-dark/50">Cobrado total</p>
-              </div>
-              <div className="flex-1 text-center border-x border-dark/10">
-                <p className="text-2xl font-bold text-orange">{executions.filter(e => e.status === "pending").length}</p>
-                <p className="text-xs text-dark/50">Pendientes</p>
-              </div>
-              <div className="flex-1 text-center">
-                <p className="text-2xl font-bold text-dark/50">{executions.filter(e => e.status === "skipped").length}</p>
-                <p className="text-xs text-dark/50">No hechas</p>
-              </div>
-            </div>
-
             {/* Acciones de hoy */}
             <div className="flex gap-2 flex-wrap">
               <Button variant="secondary" onClick={() => handleTodayAction("done")}>
@@ -300,48 +267,30 @@ export default function RutasClient({
               </Button>
             </div>
 
-            {/* Búsqueda y exportar */}
+            {/* Búsqueda */}
             <div className="flex flex-wrap gap-3 items-center">
-              {/* Búsqueda */}
               <div className="relative flex-1 min-w-[200px]">
                 <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-dark/40" />
                 <input
                   type="text"
                   placeholder="Buscar por fecha..."
                   value={searchQuery}
-                  onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(0); }}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full rounded-xl border border-dark/15 bg-white pl-10 pr-4 py-2.5 text-sm focus:border-teal"
                 />
               </div>
-              
-              {/* Toggle mostrar todas */}
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input
                   type="checkbox"
                   checked={showAll}
-                  onChange={(e) => { setShowAll(e.target.checked); setCurrentPage(0); }}
+                  onChange={(e) => setShowAll(e.target.checked)}
                   className="h-4 w-4 accent-teal"
                 />
                 Mostrar todas
               </label>
             </div>
 
-            {/* Paginación */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between">
-                <Button variant="ghost" onClick={goToPrevMonth} disabled={!canGoPrev}>
-                  <IconChevronLeft className="h-5 w-5" /> {canGoPrev && monthGroups[currentPage - 1] ? getMonthLabel(monthGroups[currentPage - 1].month) : "Anterior"}
-                </Button>
-                <span className="text-sm text-dark/60">
-                  Página {currentPage + 1} de {totalPages}
-                </span>
-                <Button variant="ghost" onClick={goToNextMonth} disabled={!canGoNext}>
-                  {canGoNext && monthGroups[currentPage + 1] ? getMonthLabel(monthGroups[currentPage + 1].month) : "Siguiente"} <IconChevronRight className="h-5 w-5" />
-                </Button>
-              </div>
-            )}
-
-            {/* Lista de fechas por mes */}
+            {/* Lista de fechas por mes - scroll continuo sin paginación */}
             <div className="space-y-4">
               {monthGroups.length === 0 ? (
                 <EmptyState
@@ -351,7 +300,6 @@ export default function RutasClient({
               ) : (
                 monthGroups.map((group) => (
                   <div key={group.month} className="rounded-xl border border-dark/10 bg-white overflow-hidden">
-                    {/* Header del mes */}
                     <div className="px-4 py-3 bg-dark/5 border-b border-dark/10">
                       <h3 className="font-bold text-dark-teal">
                         {getMonthLabel(group.month)}
@@ -360,8 +308,6 @@ export default function RutasClient({
                         </span>
                       </h3>
                     </div>
-                    
-                    {/* Lista de fechas */}
                     <div className="divide-y divide-dark/5">
                       {group.items.map((execution) => {
                         const date = new Date(execution.executionDate + "T12:00:00");
@@ -390,13 +336,6 @@ export default function RutasClient({
                               <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${statusColors[execution.status]}`}>
                                 {statusLabels[execution.status]}
                               </span>
-                            </div>
-                            
-                            {/* Monto */}
-                            <div className="text-right min-w-[80px]">
-                              <p className="font-bold text-dark-teal">
-                                {execution.status === "done" ? formatMoney(execution.amountCollected) : "RD$ 0"}
-                              </p>
                             </div>
                             
                             {/* Acciones */}
