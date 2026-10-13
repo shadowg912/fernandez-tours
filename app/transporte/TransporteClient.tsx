@@ -329,12 +329,12 @@ export default function TransporteClient({
             </div>
 
             {!selected.paid && (
-              <Button className="w-full" onClick={() => setPayStudent(selected)}>
+              <Button className="w-full" onClick={() => { setSelectedId(null); setPayStudent(selected); }}>
                 <IconCheck className="h-5 w-5" /> Registrar pago
               </Button>
             )}
             <div className="flex gap-3">
-              <Button variant="secondary" className="flex-1" onClick={() => setEditing(selected)}>
+              <Button variant="secondary" className="flex-1" onClick={() => { setSelectedId(null); setEditing(selected); }}>
                 Editar
               </Button>
               <button

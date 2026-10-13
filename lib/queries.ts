@@ -1,6 +1,5 @@
-import "server-only";
 import { query } from "./db";
-import { Client, Payment, Route, Service, ServiceStatus, Student } from "./types";
+import { Client, DailyRoute, Payment, Route, RouteExecution, Service, ServiceStatus, Student } from "./types";
 
 type Row = Record<string, unknown>;
 
@@ -60,6 +59,26 @@ function mapRoute(r: Row): Route {
     name: String(r.name),
     description: r.description == null ? undefined : String(r.description),
     color: String(r.color),
+  };
+}
+
+function mapDailyRoute(r: Row): DailyRoute {
+  return {
+    id: String(r.id),
+    name: String(r.name),
+    dailyFee: Number(r.daily_fee),
+    daysOfWeek: (r.days_of_week as string[]) ?? [],
+    generationWindowDays: Number(r.generation_window_days),
+  };
+}
+
+function mapRouteExecution(r: Row): RouteExecution {
+  return {
+    id: String(r.id),
+    routeId: String(r.route_id),
+    executionDate: toDateString(r.execution_date),
+    status: String(r.status) as RouteExecution["status"],
+    amountCollected: Number(r.amount_collected),
   };
 }
 
@@ -124,4 +143,50 @@ export async function getDashboardData(): Promise<DashboardData> {
 export async function getRoutes(): Promise<Route[]> {
   const rows = await query("select * from routes order by name");
   return rows.map(mapRoute);
+}
+
+export async function getDailyRoutes(): Promise<DailyRoute[]> {
+  const rows = await query("select * from daily_routes order by created_at desc");
+  return rows.map(mapDailyRoute);
+}
+
+export async function getDailyRouteWithExecutions(routeId: string): Promise<{ route: DailyRoute; executions: RouteExecution[] } | null> {
+  const routeRows = await query("select * from daily_routes where id = $1", [routeId]);
+  if (routeRows.length === 0) return null;
+  
+  const route = mapDailyRoute(routeRows[0]);
+  const execRows = await query(
+    "select * from route_executions where route_id = $1 order by execution_date",
+    [routeId]
+  );
+  const executions = execRows.map(mapRouteExecution);
+  
+  return { route, executions };
+}
+
+export async function getRouteExecutionsForDateRange(startDate: string, endDate: string): Promise<RouteExecution[]> {
+  const rows = await query(
+    "select * from route_executions where execution_date between $1 and $2 order by execution_date",
+    [startDate, endDate]
+  );
+  return rows.map(mapRouteExecution);
+}
+
+export async function getRouteSummary(routeId: string): Promise<{ totalCollected: number; totalPending: number; totalSkipped: number; executionCount: number } | null> {
+  const rows = await query(
+    `select 
+      coalesce(sum(case when status = 'done' then amount_collected else 0 end), 0)::int as total_collected,
+      count(*) filter (where status = 'pending')::int as total_pending,
+      count(*) filter (where status = 'skipped')::int as total_skipped,
+      count(*)::int as execution_count
+     from route_executions where route_id = $1`,
+    [routeId]
+  );
+  if (rows.length === 0) return null;
+  return {
+    totalCollected: rows[0].total_collected,
+    totalPending: rows[0].total_pending,
+    totalSkipped: rows[0].total_skipped,
+    executionCount: rows[0].execution_count,
+  };
 }

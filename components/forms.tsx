@@ -1,8 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { PayFrequency, PaymentMethod, Route, ServiceStatus, Student, StudentDraft } from "@/lib/types";
+import { DailyRoute, DailyRouteDraft, PayFrequency, PaymentMethod, Route, ServiceStatus, Student, StudentDraft } from "@/lib/types";
 import { Button, Field, Input, Modal, Select, Textarea } from "./ui";
+import { useMoneyInput } from "@/lib/hooks/useMoneyInput";
 
 function FormActions({ onCancel, loading, label }: { onCancel: () => void; loading: boolean; label: string }) {
   return (
@@ -54,6 +55,8 @@ export function ServiceForm({
     await onSaved(readForm<ServiceStatus>("service-form"));
   });
 
+  const priceInput = useMoneyInput();
+
   return (
     <Modal open={open} onClose={onClose} title="Nuevo servicio">
       <form id="service-form" onSubmit={submit} className="space-y-4">
@@ -79,7 +82,16 @@ export function ServiceForm({
             <Input name="passengers" type="number" min={1} defaultValue={1} required />
           </Field>
           <Field label="Precio (RD$)">
-            <Input name="price" type="number" min={0} placeholder="2500" required />
+            <Input
+              name="price"
+              type="number"
+              min={0}
+              placeholder="2500"
+              required
+              value={priceInput.value}
+              onChange={priceInput.onChange}
+              onBlur={priceInput.onBlur}
+            />
           </Field>
         </div>
         <Field label="Estado">
@@ -248,7 +260,14 @@ export function PaymentForm({
             </Select>
           </Field>
           <Field label="Monto (RD$)">
-            <Input name="amount" type="number" min={0} defaultValue={defaultAmount} placeholder="0" required />
+            <Input
+              name="amount"
+              type="number"
+              min={0}
+              placeholder="0"
+              required
+              defaultValue={defaultAmount ? String(defaultAmount) : ""}
+            />
           </Field>
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -272,7 +291,163 @@ export function PaymentForm({
   );
 }
 
-/* ---------- CRUD Rutas ---------- */
+/* ---------- CRUD Estudiantes ---------- */
+const allDays = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+
+export function StudentForm({
+  open,
+  onClose,
+  onSaved,
+  initial,
+  routes = [],
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSaved: (draft: StudentDraft) => void | Promise<void>;
+  initial?: Student | null;
+  routes?: Route[];
+}) {
+  if (!open) return null;
+  return <StudentFormInner key={initial?.id ?? "new"} onClose={onClose} onSaved={onSaved} initial={initial ?? null} routes={routes} />;
+}
+
+function StudentFormInner({
+  onClose,
+  onSaved,
+  initial,
+  routes = [],
+}: {
+  onClose: () => void;
+  onSaved: (draft: StudentDraft) => void | Promise<void>;
+  initial: Student | null;
+  routes?: Route[];
+}) {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [school, setSchool] = useState(initial?.school ?? "");
+  const [address, setAddress] = useState(initial?.address ?? "");
+  const [entryTime, setEntryTime] = useState(initial?.entryTime ?? "07:00");
+  const [exitTime, setExitTime] = useState(initial?.exitTime ?? "14:00");
+  const [days, setDays] = useState<string[]>(initial?.days ?? []);
+  const [frequency, setFrequency] = useState<PayFrequency>(initial?.frequency ?? "mensual");
+  const [monthlyFee, setMonthlyFee] = useState(initial ? String(initial.monthlyFee) : "");
+  const [guardian, setGuardian] = useState(initial?.guardian ?? "");
+  const [phone, setPhone] = useState(initial?.phone ?? "");
+  const [routeId, setRouteId] = useState(initial?.routeId ?? "");
+  const [loading, setLoading] = useState(false);
+
+  const toggleDay = (d: string) =>
+    setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    
+    const missing: string[] = [];
+    if (!name.trim()) missing.push("Nombre del estudiante");
+    if (!monthlyFee || Number(monthlyFee) <= 0) missing.push("Tarifa (RD$)");
+    if (days.length === 0) missing.push("Días de transporte");
+    
+    if (missing.length > 0) {
+      alert(`Faltan campos obligatorios:\n• ${missing.join("\n• ")}`);
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      await onSaved({
+        name: name.trim(),
+        school: school.trim() || undefined,
+        address: address.trim() || undefined,
+        entryTime,
+        exitTime,
+        days,
+        frequency,
+        monthlyFee: Number(monthlyFee) || 0,
+        guardian: guardian.trim() || undefined,
+        phone: phone.trim() || undefined,
+        routeId: routeId || undefined,
+        paid: initial?.paid ?? false,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal open={true} onClose={onClose} title={initial ? "Editar estudiante" : "Nuevo estudiante"}>
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="Nombre del estudiante">
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej. Carlos Martínez Jr." required />
+        </Field>
+        <Field label="Escuela / Colegio (opcional)">
+          <Input value={school} onChange={(e) => setSchool(e.target.value)} placeholder="Ej. Colegio San José" />
+        </Field>
+        <Field label="Dirección de recogida">
+          <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Sector, ciudad (opcional)" />
+        </Field>
+        <Field label="Ruta">
+          <Select value={routeId} onChange={(e) => setRouteId(e.target.value)}>
+            <option value="">— Sin ruta —</option>
+            {routes.map((r) => (
+              <option key={r.id} value={r.id}>{r.name}</option>
+            ))}
+          </Select>
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Hora de entrada">
+            <Input type="time" value={entryTime} onChange={(e) => setEntryTime(e.target.value)} required />
+          </Field>
+          <Field label="Hora de salida">
+            <Input type="time" value={exitTime} onChange={(e) => setExitTime(e.target.value)} required />
+          </Field>
+        </div>
+        <Field label="Días de transporte">
+          <div className="flex flex-wrap gap-2">
+            {allDays.map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => toggleDay(d)}
+                className={`rounded-full px-3.5 py-2 text-sm font-medium transition-colors ${
+                  days.includes(d) ? "bg-teal text-white" : "bg-white text-dark/70 border border-dark/15"
+                }`}
+              >
+                {d}
+              </button>
+            ))}
+          </div>
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Frecuencia de pago">
+            <Select value={frequency} onChange={(e) => setFrequency(e.target.value as PayFrequency)}>
+              <option value="mensual">Mensual</option>
+              <option value="quincenal">Quincenal</option>
+              <option value="semanal">Semanal</option>
+            </Select>
+          </Field>
+          <Field label="Tarifa (RD$)">
+            <Input
+              type="number"
+              min={0}
+              value={monthlyFee}
+              onChange={(e) => setMonthlyFee(e.target.value)}
+              placeholder="4500"
+              required
+            />
+          </Field>
+        </div>
+        <Field label="Representante">
+          <Input value={guardian} onChange={(e) => setGuardian(e.target.value)} placeholder="Padre / madre / encargado (opcional)" />
+        </Field>
+        <Field label="Teléfono del representante">
+          <Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="809-555-0000 (opcional)" />
+        </Field>
+        <FormActions onCancel={onClose} loading={loading} label={initial ? "Guardar cambios" : "Agregar estudiante"} />
+      </form>
+    </Modal>
+  );
+}
+
+/* ---------- Rutas (estudiantes) ---------- */
 const routeColors = [
   { value: "#16a34a", label: "Verde" },
   { value: "#14b8a6", label: "Teal" },
@@ -358,152 +533,121 @@ function RouteFormInner({
   );
 }
 
-/* ---------- CRUD Estudiantes ---------- */
-const allDays = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+/* ---------- CRUD Rutas Diarias ---------- */
+const weekDays = [
+  { value: "Mon", label: "Lun" },
+  { value: "Tue", label: "Mar" },
+  { value: "Wed", label: "Mié" },
+  { value: "Thu", label: "Jue" },
+  { value: "Fri", label: "Vie" },
+  { value: "Sat", label: "Sáb" },
+  { value: "Sun", label: "Dom" },
+];
 
-export function StudentForm({
+export function DailyRouteForm({
   open,
   onClose,
   onSaved,
   initial,
-  routes = [],
 }: {
   open: boolean;
   onClose: () => void;
-  onSaved: (draft: StudentDraft) => void | Promise<void>;
-  initial?: Student | null;
-  routes?: Route[];
+  onSaved: (draft: DailyRouteDraft) => void | Promise<void>;
+  initial?: DailyRoute | null;
 }) {
   if (!open) return null;
-  // key fuerza remount: el estado se inicializa desde `initial` sin efectos
-  return <StudentFormInner key={initial?.id ?? "new"} onClose={onClose} onSaved={onSaved} initial={initial ?? null} routes={routes} />;
+  return <DailyRouteFormInner key={initial?.id ?? "new"} onClose={onClose} onSaved={onSaved} initial={initial ?? null} />;
 }
 
-function StudentFormInner({
+function DailyRouteFormInner({
   onClose,
   onSaved,
   initial,
-  routes = [],
 }: {
   onClose: () => void;
-  onSaved: (draft: StudentDraft) => void | Promise<void>;
-  initial: Student | null;
-  routes?: Route[];
+  onSaved: (draft: DailyRouteDraft) => void | Promise<void>;
+  initial: DailyRoute | null;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
-  const [school, setSchool] = useState(initial?.school ?? "");
-  const [address, setAddress] = useState(initial?.address ?? "");
-  const [entryTime, setEntryTime] = useState(initial?.entryTime ?? "07:00");
-  const [exitTime, setExitTime] = useState(initial?.exitTime ?? "14:00");
-  const [days, setDays] = useState<string[]>(initial?.days ?? []);
-  const [frequency, setFrequency] = useState<PayFrequency>(initial?.frequency ?? "mensual");
-  const [monthlyFee, setMonthlyFee] = useState(initial ? String(initial.monthlyFee) : "");
-  const [guardian, setGuardian] = useState(initial?.guardian ?? "");
-  const [phone, setPhone] = useState(initial?.phone ?? "");
-  const [routeId, setRouteId] = useState(initial?.routeId ?? "");
-  const [loading, setLoading] = useState(false);
+  const [dailyFee, setDailyFee] = useState(initial ? String(initial.dailyFee) : "");
+  const [daysOfWeek, setDaysOfWeek] = useState<string[]>(initial?.daysOfWeek ?? []);
+  const [generationWindowDays, setGenerationWindowDays] = useState(initial ? String(initial.generationWindowDays) : "60");
 
   const toggleDay = (d: string) =>
-    setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
+    setDaysOfWeek((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
 
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    
-    // Validación cliente para campos obligatorios
-    const missing: string[] = [];
-    if (!name.trim()) missing.push("Nombre del estudiante");
-    if (!monthlyFee || Number(monthlyFee) <= 0) missing.push("Tarifa (RD$)");
-    if (days.length === 0) missing.push("Días de transporte");
-    
-    if (missing.length > 0) {
-      alert(`Faltan campos obligatorios:\n• ${missing.join("\n• ")}`);
+  const { submit, loading: submitLoading } = useSubmit(async () => {
+    if (!name.trim()) {
+      alert("El nombre de la ruta es obligatorio");
       return;
     }
-    
-    setLoading(true);
+    if (!dailyFee || Number(dailyFee) <= 0) {
+      alert("La tarifa diaria es obligatoria");
+      return;
+    }
+    if (daysOfWeek.length === 0) {
+      alert("Selecciona al menos un día de la semana");
+      return;
+    }
+    if (!generationWindowDays || Number(generationWindowDays) <= 0) {
+      alert("La ventana de generación (días) es obligatoria");
+      return;
+    }
     try {
       await onSaved({
         name: name.trim(),
-        school: school.trim() || undefined,
-        address: address.trim() || undefined,
-        entryTime,
-        exitTime,
-        days,
-        frequency,
-        monthlyFee: Number(monthlyFee) || 0,
-        guardian: guardian.trim() || undefined,
-        phone: phone.trim() || undefined,
-        routeId: routeId || undefined,
-        paid: initial?.paid ?? false,
+        dailyFee: Number(dailyFee),
+        daysOfWeek,
+        generationWindowDays: Number(generationWindowDays),
       });
-    } finally {
-      setLoading(false);
+    } catch {
+      // Error handled by useSubmit
     }
-  };
+  });
 
   return (
-    <Modal open={true} onClose={onClose} title={initial ? "Editar estudiante" : "Nuevo estudiante"}>
+    <Modal open={true} onClose={onClose} title={initial ? "Editar ruta diaria" : "Nueva ruta diaria"}>
       <form onSubmit={submit} className="space-y-4">
-        <Field label="Nombre del estudiante">
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej. Carlos Martínez Jr." required />
+        <Field label="Nombre de la ruta">
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej. Ruta Norte" required />
         </Field>
-        <Field label="Escuela / Colegio (opcional)">
-          <Input value={school} onChange={(e) => setSchool(e.target.value)} placeholder="Ej. Colegio San José" />
+        <Field label="Tarifa diaria (RD$)">
+          <Input
+            type="number"
+            min={0}
+            value={dailyFee}
+            onChange={(e) => setDailyFee(e.target.value)}
+            placeholder="2500"
+            required
+          />
         </Field>
-        <Field label="Dirección de recogida">
-          <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Sector, ciudad (opcional)" />
-        </Field>
-        <Field label="Ruta">
-          <Select value={routeId} onChange={(e) => setRouteId(e.target.value)}>
-            <option value="">— Sin ruta —</option>
-            {routes.map((r) => (
-              <option key={r.id} value={r.id}>{r.name}</option>
-            ))}
-          </Select>
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Hora de entrada">
-            <Input type="time" value={entryTime} onChange={(e) => setEntryTime(e.target.value)} required />
-          </Field>
-          <Field label="Hora de salida">
-            <Input type="time" value={exitTime} onChange={(e) => setExitTime(e.target.value)} required />
-          </Field>
-        </div>
-        <Field label="Días de transporte">
+        <Field label="Días de la semana">
           <div className="flex flex-wrap gap-2">
-            {allDays.map((d) => (
+            {weekDays.map((d) => (
               <button
-                key={d}
+                key={d.value}
                 type="button"
-                onClick={() => toggleDay(d)}
+                onClick={() => toggleDay(d.value)}
                 className={`rounded-full px-3.5 py-2 text-sm font-medium transition-colors ${
-                  days.includes(d) ? "bg-teal text-white" : "bg-white text-dark/70 border border-dark/15"
+                  daysOfWeek.includes(d.value) ? "bg-teal text-white" : "bg-white text-dark/70 border border-dark/15"
                 }`}
               >
-                {d}
+                {d.label}
               </button>
             ))}
           </div>
         </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Frecuencia de pago">
-            <Select value={frequency} onChange={(e) => setFrequency(e.target.value as PayFrequency)}>
-              <option value="mensual">Mensual</option>
-              <option value="quincenal">Quincenal</option>
-              <option value="semanal">Semanal</option>
-            </Select>
-          </Field>
-          <Field label="Tarifa (RD$)">
-            <Input type="number" min={0} value={monthlyFee} onChange={(e) => setMonthlyFee(e.target.value)} placeholder="4500" required />
-          </Field>
-        </div>
-        <Field label="Representante">
-          <Input value={guardian} onChange={(e) => setGuardian(e.target.value)} placeholder="Padre / madre / encargado (opcional)" />
+        <Field label="Ventana de generación (días)">
+          <Input
+            type="number"
+            min={1}
+            value={generationWindowDays}
+            onChange={(e) => setGenerationWindowDays(e.target.value)}
+            placeholder="60"
+            required
+          />
         </Field>
-        <Field label="Teléfono del representante">
-          <Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="809-555-0000 (opcional)" />
-        </Field>
-        <FormActions onCancel={onClose} loading={loading} label={initial ? "Guardar cambios" : "Agregar estudiante"} />
+        <FormActions onCancel={onClose} loading={submitLoading} label={initial ? "Guardar cambios" : "Crear ruta"} />
       </form>
     </Modal>
   );

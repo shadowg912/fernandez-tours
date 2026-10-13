@@ -2,10 +2,10 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { Service, ServiceStatus } from "@/lib/types";
-import { createService } from "@/lib/actions";
+import { createService, completeService, cancelService } from "@/lib/actions";
 import { ServiceCard } from "@/components/cards";
 import { Button, EmptyState, Modal, StatusBadge, Toast } from "@/components/ui";
-import { ServiceForm } from "@/components/forms";
+import { ConfirmDialog, ServiceForm } from "@/components/forms";
 import { formatDateLong, formatMoney } from "@/lib/format";
 import { IconPlus } from "@/components/icons";
 
@@ -26,6 +26,8 @@ export default function ServiciosClient({ services }: { services: Service[] }) {
   const [formOpen, setFormOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [completing, setCompleting] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   useEffect(() => {
@@ -39,6 +41,34 @@ export default function ServiciosClient({ services }: { services: Service[] }) {
     .filter((s) => (showAllDates ? true : s.date === date));
 
   const selectedService = services.find((s) => s.id === selected) ?? null;
+
+  const run = (fn: () => Promise<void>, message: string) => {
+    startTransition(async () => {
+      await fn();
+      setToast(message);
+    });
+  };
+
+  const handleComplete = (service: Service) => setCompleting(service.id);
+  const handleCancel = (service: Service) => setCancelling(service.id);
+
+  const confirmComplete = () => {
+    if (!completing) return;
+    run(async () => {
+      await completeService(completing);
+      setCompleting(null);
+      setSelected(null);
+    }, "Servicio completado");
+  };
+
+  const confirmCancel = () => {
+    if (!cancelling) return;
+    run(async () => {
+      await cancelService(cancelling);
+      setCancelling(null);
+      setSelected(null);
+    }, "Servicio cancelado");
+  };
 
   return (
     <div className="space-y-5">
@@ -93,7 +123,13 @@ export default function ServiciosClient({ services }: { services: Service[] }) {
       ) : (
         <div className="space-y-3 md:grid md:grid-cols-2 xl:grid-cols-3 md:gap-3 md:space-y-0">
           {list.map((s) => (
-            <ServiceCard key={s.id} service={s} onClick={() => setSelected(s.id)} />
+            <ServiceCard
+              key={s.id}
+              service={s}
+              onClick={() => setSelected(s.id)}
+              onComplete={() => handleComplete(s)}
+              onCancel={() => handleCancel(s)}
+            />
           ))}
         </div>
       )}
@@ -128,6 +164,24 @@ export default function ServiciosClient({ services }: { services: Service[] }) {
           </div>
         )}
       </Modal>
+
+      <ConfirmDialog
+        open={completing !== null}
+        onClose={() => setCompleting(null)}
+        onConfirm={confirmComplete}
+        title="Completar servicio"
+        message="¿Marcar este servicio como completado?"
+        confirmLabel="Completar"
+      />
+
+      <ConfirmDialog
+        open={cancelling !== null}
+        onClose={() => setCancelling(null)}
+        onConfirm={confirmCancel}
+        title="Cancelar servicio"
+        message="¿Marcar este servicio como cancelado?"
+        confirmLabel="Cancelar"
+      />
 
       <Toast message={toast} />
     </div>

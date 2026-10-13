@@ -1,15 +1,15 @@
-import { Client, Payment, PayFrequency, PaymentMethod, PaymentStatus, Service, ServiceStatus, Student } from "./types";
+import { Client, DailyRoute, ExecutionStatus, Payment, PayFrequency, PaymentMethod, PaymentStatus, Route, RouteExecution, Service, ServiceStatus, Student } from "./types";
 
 /**
  * Mapa de tablas de Supabase tipado con las interfaces del dominio.
  * Las columnas de cada tabla deben coincidir con estos Row types.
  */
-import { Route } from "./types";
-
 export interface Database {
   public: {
     Tables: {
       clients: Table<Client>;
+      daily_routes: Table<DailyRoute>;
+      route_executions: Table<RouteExecution>;
       services: Table<Service>;
       students: Table<Student>;
       payments: Table<Payment>;
@@ -22,6 +22,7 @@ export interface Database {
       pay_frequency: PayFrequency;
       payment_method: PaymentMethod;
       payment_status: PaymentStatus;
+      execution_status: ExecutionStatus;
     };
     CompositeTypes: Record<string, never>;
   };
