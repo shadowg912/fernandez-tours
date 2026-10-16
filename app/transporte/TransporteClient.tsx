@@ -65,6 +65,10 @@ export default function TransporteClient({
   const total = students.reduce((sum, s) => sum + s.monthlyFee, 0);
   const collected = students.filter((s) => s.paid).reduce((sum, s) => sum + s.monthlyFee, 0);
 
+  // La sección "Pagos pendientes" sustituye a la lista principal en el filtro "Pendientes"
+  const showPendingSection =
+    pendingStudents.length > 0 && filter === "pendiente" && selectedRouteId === "";
+
   const filtered = students.filter((s) => {
     // Filtro por ruta
     if (selectedRouteId && s.routeId !== selectedRouteId) return false;
@@ -194,7 +198,7 @@ export default function TransporteClient({
         </div>
       </div>
 
-      {pendingStudents.length > 0 && (filter === "todos" || filter === "pendiente") && selectedRouteId === "" && (
+      {showPendingSection && (
         <section>
           <h2 className="mb-3 text-lg font-bold">Pagos pendientes</h2>
           <div className="space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0">
@@ -210,6 +214,7 @@ export default function TransporteClient({
         </section>
       )}
 
+      {!showPendingSection && (
       <section>
         <h2 className="mb-3 text-lg font-bold">
           {selectedRouteId ? selectedRoute?.name : filter === "todos" ? "Todos los estudiantes" : filters.find((f) => f.value === filter)?.label}
@@ -238,6 +243,7 @@ export default function TransporteClient({
           </div>
         )}
       </section>
+      )}
 
       {/* Crear estudiante */}
       <StudentForm 
