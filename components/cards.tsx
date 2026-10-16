@@ -159,13 +159,6 @@ export function ClientCard({ client, onClick }: { client: Client; onClick?: () =
 
 /* ---------- StudentCard ---------- */
 
-function formatTime12h(time24: string): string {
-  const [h, m] = time24.split(":").map(Number);
-  const period = h >= 12 ? "PM" : "AM";
-  const hour = h % 12 === 0 ? 12 : h % 12;
-  return `${hour}:${String(m).padStart(2, "0")} ${period}`;
-}
-
 const frequencyLabel = { mensual: "Mensual", quincenal: "Quincenal", semanal: "Semanal" } as const;
 
 export function StudentCard({ 
@@ -188,9 +181,6 @@ export function StudentCard({
               {student.school && (
                 <p className="mt-1 text-sm text-dark/60 truncate">{student.school}</p>
               )}
-              <p className="mt-1 text-xs text-dark/50 truncate">
-                {formatTime12h(student.entryTime)} – {formatTime12h(student.exitTime)}
-              </p>
               {/* Pago y periodicidad */}
               <div className="mt-2 flex items-center gap-3 text-xs text-dark/60">
                 <span className="flex items-center gap-1 font-medium text-dark-teal">
