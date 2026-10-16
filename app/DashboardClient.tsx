@@ -9,6 +9,7 @@ import { formatDateLong, formatDateShort, formatMoney } from "@/lib/format";
 import { SummaryCard, ServiceCard } from "@/components/cards";
 import { Avatar, Button, Card, EmptyState, Modal, StatusBadge, Toast } from "@/components/ui";
 import { IconBell, IconCalendar, IconChevronRight, IconCheck, IconUsers } from "@/components/icons";
+import ThemeToggle from "@/components/ThemeToggle";
 
 type DetailView = "today" | "completed" | "upcoming" | "students";
 
@@ -86,6 +87,7 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
           <p className="mt-1 text-xs capitalize text-cream/70">{formatDateLong(new Date(data.today + "T12:00:00"))}</p>
         </div>
         <div className="flex items-center gap-3">
+          <ThemeToggle className="bg-white/10 text-cream hover:bg-white/20" />
           <button aria-label="Notificaciones" className="relative rounded-full bg-white/10 p-2.5 hover:bg-white/20 transition-colors">
             <IconBell className="h-5 w-5" />
             <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-orange" />
