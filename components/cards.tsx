@@ -11,11 +11,13 @@ export function SummaryCard({
   label,
   accent = false,
   onClick,
+  hint,
 }: {
   value: string;
   label: string;
   accent?: boolean;
   onClick?: () => void;
+  hint?: string;
 }) {
   return (
     <button
@@ -32,7 +34,8 @@ export function SummaryCard({
       >
         {value}
       </p>
-      <p className="mt-1 text-xs md:text-sm leading-snug text-dark/60">{label}</p>
+      <p className="mt-1 text-sm md:text-base font-semibold leading-snug text-dark/70">{label}</p>
+      {hint && <p className="mt-0.5 text-[11px] leading-snug text-dark/45">{hint}</p>}
     </button>
   );
 }

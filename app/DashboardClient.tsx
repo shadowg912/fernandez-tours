@@ -126,13 +126,29 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
 
       {/* Resumen: cada tarjeta abre su detalle */}
       <section className="flex flex-wrap gap-3">
-        <SummaryCard value={String(data.todayServices.length)} label="Servicios hoy" onClick={() => setDetail("today")} />
-        <SummaryCard value={String(data.completedMonth.length)} label="Servicios realizados" onClick={() => setDetail("completed")} />
-        <SummaryCard value={String(data.upcomingMonth.length)} label="Próximos servicios" onClick={() => setDetail("upcoming")} />
+        <SummaryCard
+          value={String(data.todayServices.length)}
+          label="Servicios hoy"
+          hint="Toque para más detalles"
+          onClick={() => setDetail("today")}
+        />
+        <SummaryCard
+          value={String(data.completedMonth.length)}
+          label="Servicios realizados"
+          hint="Toque para más detalles"
+          onClick={() => setDetail("completed")}
+        />
+        <SummaryCard
+          value={String(data.upcomingMonth.length)}
+          label="Próximos servicios"
+          hint="Toque para más detalles"
+          onClick={() => setDetail("upcoming")}
+        />
         <SummaryCard
           value={String(data.pendingStudents.length)}
           label="Estudiantes por pagar"
           accent
+          hint="Toque para más detalles"
           onClick={() => setDetail("students")}
         />
       </section>
