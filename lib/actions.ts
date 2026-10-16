@@ -102,6 +102,13 @@ export async function cancelService(id: string) {
   revalidatePath("/agenda");
 }
 
+export async function confirmService(id: string) {
+  const query = await getQuery();
+  await query("update services set status='confirmado' where id=$1", [id]);
+  revalidatePath("/servicios");
+  revalidatePath("/agenda");
+}
+
 /* ---------- Clientes ---------- */
 export async function createClient(d: ClientDraft) {
   const query = await getQuery();

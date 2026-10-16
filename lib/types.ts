@@ -1,4 +1,4 @@
-export type ServiceStatus = "confirmado" | "pendiente" | "completado" | "cancelado";
+export type ServiceStatus = "pendiente_confirmacion" | "confirmado" | "completado" | "cancelado";
 
 export interface Service {
   id: string;

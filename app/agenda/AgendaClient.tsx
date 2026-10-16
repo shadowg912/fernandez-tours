@@ -12,8 +12,8 @@ type ViewMode = "day" | "week" | "month";
 const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
 const statusLabels: Record<string, string> = {
+  pendiente_confirmacion: "Por confirmar",
   confirmado: "Confirmado",
-  pendiente: "Pendiente",
   completado: "Completado",
   cancelado: "Cancelado",
   done: "Hecha",
@@ -21,8 +21,8 @@ const statusLabels: Record<string, string> = {
 };
 
 const statusColors: Record<string, string> = {
+  pendiente_confirmacion: "bg-yellow/15 text-yellow-700",
   confirmado: "bg-teal/15 text-dark-teal",
-  pendiente: "bg-orange/15 text-orange",
   completado: "bg-green/15 text-green",
   cancelado: "bg-red/15 text-red",
   done: "bg-teal/15 text-teal",
@@ -96,10 +96,10 @@ export default function AgendaClient({
   const items: AgendaItem[] = useMemo(() => {
     const result: AgendaItem[] = [];
     
-    // Add services
+    // Add services (exclude pendiente_confirmacion)
     if (filter === "all" || filter === "services") {
       services
-        .filter(s => s.date >= start && s.date <= end)
+        .filter(s => s.date >= start && s.date <= end && s.status !== "pendiente_confirmacion")
         .forEach(s => {
           result.push({
             id: `svc-${s.id}`,
@@ -241,15 +241,32 @@ export default function AgendaClient({
             const dayNum = itemDate.getDate();
             const monthShort = monthNames[itemDate.getMonth()].slice(0, 3);
             
+            // Determine status color for the indicator line
+            const isCompleted = item.type === "service" 
+              ? item.status === "completado" 
+              : item.status === "done";
+            const isCancelled = item.type === "service" 
+              ? item.status === "cancelado" 
+              : item.status === "skipped";
+            const isPending = !isCompleted && !isCancelled;
+            
+            const statusLineColor = isCompleted 
+              ? "border-l-4 border-l-green" 
+              : isCancelled 
+                ? "border-l-4 border-l-gray" 
+                : isPending 
+                  ? "border-l-4 border-l-red" 
+                  : "border-l-4 border-l-orange";
+
             return (
               <div
                 key={item.id}
                 onClick={() => setSelectedItem(item)}
-                className={`cursor-pointer transition-all hover:shadow-md ${
+                className={`cursor-pointer transition-all hover:shadow-md border-l-4 ${statusLineColor} ${
                   item.type === "route" 
-                    ? "border-l-4 border-l-teal bg-white rounded-xl shadow-sm" 
-                    : "bg-white rounded-xl shadow-sm border border-dark/5"
-                } ${isToday ? "ring-2 ring-teal/30" : ""}`}
+                    ? "bg-white rounded-xl shadow-sm" 
+                    : "bg-white rounded-xl shadow-sm"
+                } ${isToday ? "ring-2 ring-teal/30" : "border border-dark/5"}`}
               >
                 <div className="p-4 flex items-center gap-3">
                   {/* Date badge */}
@@ -276,10 +293,9 @@ export default function AgendaClient({
                     {item.time && <p className="text-xs text-dark/50">{item.time}</p>}
                   </div>
                   
-                  {/* Amount & status */}
-                  <div className="text-right shrink-0">
-                    <p className="font-bold text-gold-deep">{formatMoney(item.amount)}</p>
-                    <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${statusColors[item.status]}`}>
+                  {/* Status badge (monto eliminado para UI más limpia) */}
+                  <div className="shrink-0">
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${statusColors[item.status]}`}>
                       {statusLabels[item.status]}
                     </span>
                   </div>
@@ -312,7 +328,7 @@ export default function AgendaClient({
               <p><span className="font-semibold">Estado:</span> <StatusBadge status={selectedService.status} /></p>
             </div>
             
-            {(selectedService.status === "confirmado" || selectedService.status === "pendiente") && (
+            {selectedService.status === "confirmado" && (
               <div className="flex gap-2">
                 <Button className="flex-1" onClick={() => handleServiceAction(selectedService.id, "complete")}>
                   ✓ Marcar como hecho
