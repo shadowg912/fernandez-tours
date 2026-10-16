@@ -204,8 +204,11 @@ export function StudentCard({
                 </span>
               </div>
             </div>
-            <div className="mt-3 flex items-center">
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               {student.paid ? <Chip tone="teal">Pagado</Chip> : <Chip tone="danger">Pendiente</Chip>}
+              {student.paid && student.paidUntil && (
+                <span className="text-xs text-dark/50">hasta {formatDateShort(student.paidUntil)}</span>
+              )}
             </div>
           </div>
 
@@ -235,8 +238,20 @@ export function StudentCard({
 }
 
 /* ---------- PaymentCard ---------- */
-export function PaymentCard({ payment }: { payment: Payment }) {
+export function PaymentCard({
+  payment,
+  onEdit,
+  onDelete,
+  onMarkPaid,
+}: {
+  payment: Payment;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  onMarkPaid?: () => void;
+}) {
   const methodLabel = { efectivo: "Efectivo", transferencia: "Transferencia", tarjeta: "Tarjeta" }[payment.method];
+  const linkLabel = payment.studentId ? "Estudiante" : payment.clientId ? "Cliente" : null;
+  const hasActions = Boolean(onEdit || onDelete || onMarkPaid);
   return (
     <Card className="p-4">
       <div className="flex items-start justify-between gap-3">
@@ -246,6 +261,12 @@ export function PaymentCard({ payment }: { payment: Payment }) {
           <p className="mt-0.5 text-xs text-dark/50">
             {formatDateShort(payment.date)} · {methodLabel}
           </p>
+          {(payment.advance || linkLabel) && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              {payment.advance && <Chip tone="gold">Adelantado</Chip>}
+              {linkLabel && <Chip>{linkLabel}</Chip>}
+            </div>
+          )}
         </div>
         <div className="text-right shrink-0">
           <Money amount={payment.amount} className="text-dark-teal" />
@@ -254,6 +275,37 @@ export function PaymentCard({ payment }: { payment: Payment }) {
           </div>
         </div>
       </div>
+      {hasActions && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {payment.status === "pendiente" && onMarkPaid && (
+            <button
+              type="button"
+              onClick={onMarkPaid}
+              className="rounded-lg bg-teal px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-teal/90 active:scale-[.98]"
+            >
+              Marcar como pagado
+            </button>
+          )}
+          {onEdit && (
+            <button
+              type="button"
+              onClick={onEdit}
+              className="rounded-lg border border-dark/15 bg-white px-3 py-2 text-xs font-semibold text-dark transition-colors hover:border-teal hover:text-dark-teal"
+            >
+              Editar
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={onDelete}
+              className="rounded-lg border border-orange/40 bg-orange/10 px-3 py-2 text-xs font-semibold text-orange transition-colors hover:bg-orange/20"
+            >
+              Eliminar
+            </button>
+          )}
+        </div>
+      )}
     </Card>
   );
 }

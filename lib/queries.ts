@@ -47,6 +47,7 @@ function mapStudent(r: Row): Student {
     monthlyFee: Number(r.monthly_fee),
     frequency: r.frequency as Student["frequency"],
     paid: Boolean(r.paid),
+    paidUntil: r.paid_until == null ? undefined : toDateString(r.paid_until),
     guardian: String(r.guardian),
     phone: String(r.phone),
     routeId: r.route_id == null ? undefined : String(r.route_id),
@@ -91,6 +92,11 @@ function mapPayment(r: Row): Payment {
     amount: Number(r.amount),
     method: r.method as Payment["method"],
     status: r.status as Payment["status"],
+    period: r.period == null ? undefined : String(r.period),
+    observation: r.observation == null ? undefined : String(r.observation),
+    studentId: r.student_id == null ? undefined : String(r.student_id),
+    clientId: r.client_id == null ? undefined : String(r.client_id),
+    advance: Boolean(r.advance),
   };
 }
 

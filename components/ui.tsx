@@ -1,6 +1,6 @@
 "use client";
 
-import { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes, useEffect } from "react";
+import { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes, useEffect, useId, useRef, useState } from "react";
 import { ServiceStatus } from "@/lib/types";
 import { formatMoney } from "@/lib/format";
 import { IconX } from "./icons";
@@ -91,6 +91,92 @@ export function Select({ children, ...props }: SelectHTMLAttributes<HTMLSelectEl
     <select className={`${inputBase} appearance-none`} {...props}>
       {children}
     </select>
+  );
+}
+
+/* ---------- SearchSelect (select con búsqueda) ---------- */
+export function SearchSelect({
+  options,
+  value,
+  onChange,
+  placeholder = "Escribir para buscar…",
+  disabled = false,
+}: {
+  options: { value: string; label: string }[];
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const listId = useId();
+
+  const selected = options.find((o) => o.value === value);
+  const q = query.trim().toLowerCase();
+  const filtered = q ? options.filter((o) => o.label.toLowerCase().includes(q)) : options;
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocMouseDown = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setQuery("");
+      }
+    };
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, [open]);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <input
+        type="text"
+        role="combobox"
+        aria-expanded={open}
+        aria-controls={listId}
+        disabled={disabled}
+        value={open ? query : selected?.label ?? ""}
+        placeholder={selected ? selected.label : placeholder}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => {
+          setOpen(true);
+          setQuery("");
+        }}
+        className={`${inputBase} pr-9`}
+      />
+      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-dark/40">▾</span>
+      {open && (
+        <ul id={listId} className="absolute z-30 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-dark/10 bg-white py-1 shadow-lg">
+          {filtered.length === 0 ? (
+            <li className="px-4 py-2 text-sm text-dark/50">Sin resultados</li>
+          ) : (
+            filtered.map((o) => (
+              <li key={o.value}>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    onChange(o.value);
+                    setOpen(false);
+                    setQuery("");
+                  }}
+                  className={`w-full px-4 py-2 text-left text-sm transition-colors hover:bg-teal/10 ${
+                    o.value === value ? "bg-teal/5 font-semibold text-dark-teal" : ""
+                  }`}
+                >
+                  {o.label}
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
+      )}
+    </div>
   );
 }
 
