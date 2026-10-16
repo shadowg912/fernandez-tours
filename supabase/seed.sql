@@ -13,12 +13,12 @@ insert into clients (name, phone, email, address, service_type, last_service, ba
 -- Servicios
 insert into services (client_name, date, time, origin, destination, passengers, price, status) values
   ('María Rodríguez', '2026-09-24', '08:00 AM', 'Santiago', 'La Vega', 2, 2500, 'confirmado'),
-  ('José Fernández', '2026-09-24', '10:30 AM', 'Santiago', 'Santo Domingo', 4, 6000, 'pendiente'),
+  ('José Fernández', '2026-09-24', '10:30 AM', 'Santiago', 'Santo Domingo', 4, 6000, 'pendiente_confirmacion'),
   ('Ana Peña', '2026-09-24', '02:00 PM', 'La Vega', 'Jarabacoa', 3, 3200, 'confirmado'),
   ('Carlos Martínez', '2026-09-25', '07:00 AM', 'Santiago', 'Puerto Plata', 5, 7500, 'confirmado'),
-  ('Laura Gómez', '2026-09-25', '11:00 AM', 'Moca', 'Santiago', 1, 1200, 'pendiente'),
+  ('Laura Gómez', '2026-09-25', '11:00 AM', 'Moca', 'Santiago', 1, 1200, 'pendiente_confirmacion'),
   ('Pedro Vásquez', '2026-09-26', '06:30 AM', 'San Francisco de Macorís', 'Santo Domingo', 3, 5500, 'confirmado'),
-  ('Rosa Díaz', '2026-09-26', '03:00 PM', 'Santiago', 'Constanza', 4, 6800, 'pendiente'),
+  ('Rosa Díaz', '2026-09-26', '03:00 PM', 'Santiago', 'Constanza', 4, 6800, 'pendiente_confirmacion'),
   ('Miguel Soriano', '2026-09-23', '09:00 AM', 'Santiago', 'Samaná', 6, 12000, 'completado'),
   ('Carmen Reyes', '2026-09-23', '01:00 PM', 'La Vega', 'Santiago', 2, 1800, 'completado'),
   ('Héctor Núñez', '2026-09-22', '05:00 PM', 'Santiago', 'Moca', 2, 1500, 'cancelado');

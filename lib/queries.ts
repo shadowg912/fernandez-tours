@@ -129,12 +129,12 @@ export async function getDashboardData(): Promise<DashboardData> {
   const todayServices = (await query("select * from services where date = $1 order by time", [today])).map(mapService);
 
   const [{ n: upcomingCount }] = await query<{ n: number }>(
-    "select count(*)::int as n from services where date > $1 and status in ('confirmado','pendiente')",
+    "select count(*)::int as n from services where date > $1 and status in ('confirmado','pendiente_confirmacion')",
     [today]
   );
   const [{ n: clientsCount }] = await query<{ n: number }>("select count(*)::int as n from clients");
   const [{ n: pendingMoney }] = await query<{ n: number }>(
-    "select coalesce(sum(price), 0)::int as n from services where status = 'pendiente'"
+    "select coalesce(sum(price), 0)::int as n from services where status = 'pendiente_confirmacion'"
   );
 
   return { today, todayServices, upcomingCount, clientsCount, pendingMoney };

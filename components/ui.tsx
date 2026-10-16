@@ -7,16 +7,16 @@ import { IconX } from "./icons";
 
 /* ---------- Badge ---------- */
 const statusStyles: Record<ServiceStatus, string> = {
+  pendiente_confirmacion: "bg-yellow/15 text-yellow-700",
   confirmado: "bg-teal/15 text-dark-teal",
-  pendiente: "bg-orange/15 text-orange",
   completado: "bg-green/15 text-green",
   cancelado: "bg-dark/10 text-dark/60",
 };
 
 export function StatusBadge({ status }: { status: ServiceStatus }) {
   const labels: Record<ServiceStatus, string> = {
+    pendiente_confirmacion: "Por confirmar",
     confirmado: "Confirmado",
-    pendiente: "Pendiente",
     completado: "Completado",
     cancelado: "Cancelado",
   };

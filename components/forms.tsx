@@ -97,7 +97,7 @@ export function ServiceForm({
         <Field label="Estado">
           <Select name="status" defaultValue="confirmado">
             <option value="confirmado">Confirmado</option>
-            <option value="pendiente">Pendiente</option>
+            <option value="pendiente_confirmacion">Por confirmar</option>
           </Select>
         </Field>
         <Field label="Observaciones">
@@ -131,7 +131,7 @@ function readForm<T extends string>(formId: string): {
     destination: String(fd.get("destination") ?? "").trim(),
     passengers: Number(fd.get("passengers")) || 1,
     price: Number(fd.get("price")) || 0,
-    status: (String(fd.get("status") ?? "pendiente") as T),
+    status: (String(fd.get("status") ?? "pendiente_confirmacion") as T),
     ...(obs ? { observations: obs } : {}),
   };
 }

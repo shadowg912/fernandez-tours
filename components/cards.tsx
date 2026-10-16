@@ -29,15 +29,19 @@ export function SummaryCard({ value, label, accent = false }: { value: string; l
 export function ServiceCard({ 
   service, 
   onClick, 
+  onConfirm,
   onComplete, 
   onCancel 
 }: { 
   service: Service; 
   onClick?: () => void;
+  onConfirm?: () => void;
   onComplete?: () => void;
   onCancel?: () => void;
 }) {
-  const canAct = service.status === "confirmado" || service.status === "pendiente";
+  const canConfirm = service.status === "pendiente_confirmacion";
+  const canComplete = service.status === "confirmado";
+  const canCancel = service.status === "confirmado" || service.status === "pendiente_confirmacion";
   
   return (
     <div className="w-full" onClick={onClick}>
@@ -57,9 +61,22 @@ export function ServiceCard({
             <Money amount={service.price} className="text-gold-deep" />
             <div className="mt-2 flex flex-col items-end gap-1.5">
               <StatusBadge status={service.status} />
-              {canAct && (onComplete || onCancel) && (
+              {(canConfirm || canComplete || canCancel) && (
                 <div className="w-full flex flex-col gap-2">
-                  {onComplete && (
+                  {canConfirm && onConfirm && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onConfirm(); }}
+                      className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-green text-white px-4 py-3 text-sm font-semibold hover:bg-green/90 active:bg-green active:scale-[.98] transition-colors"
+                      title="Confirmar servicio"
+                    >
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                      Confirmar
+                    </button>
+                  )}
+                  {canComplete && onComplete && (
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); onComplete(); }}
@@ -72,7 +89,7 @@ export function ServiceCard({
                       Completado
                     </button>
                   )}
-                  {onCancel && (
+                  {canCancel && onCancel && (
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); onCancel(); }}

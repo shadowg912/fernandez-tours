@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { Service, ServiceStatus } from "@/lib/types";
-import { createService, completeService, cancelService } from "@/lib/actions";
+import { createService, completeService, cancelService, confirmService } from "@/lib/actions";
 import { ServiceCard } from "@/components/cards";
 import { Button, EmptyState, Modal, StatusBadge, Toast } from "@/components/ui";
 import { ConfirmDialog, ServiceForm } from "@/components/forms";
@@ -13,8 +13,8 @@ type Filter = "todos" | ServiceStatus;
 
 const filters: { value: Filter; label: string }[] = [
   { value: "todos", label: "Todos" },
+  { value: "pendiente_confirmacion", label: "Por confirmar" },
   { value: "confirmado", label: "Confirmados" },
-  { value: "pendiente", label: "Pendientes" },
   { value: "completado", label: "Completados" },
   { value: "cancelado", label: "Cancelados" },
 ];
@@ -51,6 +51,7 @@ export default function ServiciosClient({ services }: { services: Service[] }) {
 
   const handleComplete = (service: Service) => setCompleting(service.id);
   const handleCancel = (service: Service) => setCancelling(service.id);
+  const handleConfirm = (service: Service) => confirmService(service.id);
 
   const confirmComplete = () => {
     if (!completing) return;
@@ -127,6 +128,7 @@ export default function ServiciosClient({ services }: { services: Service[] }) {
               key={s.id}
               service={s}
               onClick={() => setSelected(s.id)}
+              onConfirm={() => handleConfirm(s)}
               onComplete={() => handleComplete(s)}
               onCancel={() => handleCancel(s)}
             />
