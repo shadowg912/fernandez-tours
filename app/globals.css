@@ -24,3 +24,33 @@ body {
   outline: 2px solid var(--color-teal);
   outline-offset: 2px;
 }
+
+/* ===================== Modo oscuro ===================== */
+/* Se activa con la clase .dark en <html>. Recoloreamos la paleta
+   (texto, bordes y overlays) invirtiendo --color-dark a un tono claro,
+   y mantenemos los bloques oscuros/acentos consistentes. */
+.dark {
+  --color-dark: #e6edf3; /* texto principal, bordes y overlays */
+  color-scheme: dark;    /* controles nativos (date, month, etc.) */
+}
+
+.dark body {
+  background-color: #0b1620;
+  color: #e6edf3;
+}
+
+/* Superficies claras -> superficies oscuras */
+.dark .bg-white { background-color: #12242f; }
+.dark .bg-cream { background-color: #0b1620; }
+
+/* Bloques que deben seguir oscuros (header, nav, toast, backdrop) */
+.dark .bg-dark { background-color: #0a1d28; }
+.dark .bg-dark\/60 { background-color: rgba(2, 7, 11, 0.7); }
+
+/* Acentos usados como texto: aclarar para contraste sobre fondo oscuro */
+.dark .text-dark-teal { color: #5fc4c6; }
+.dark .text-gold-deep { color: #d9b981; }
+.dark .text-gold { color: #d9b981; }
+.dark .text-green { color: #8fbf7a; }
+.dark .text-orange { color: #e8a24a; }
+.dark .text-yellow-700 { color: #f0c96b; }

@@ -1,8 +1,8 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { DailyRoute, DailyRouteDraft, PayFrequency, PaymentMethod, Route, ServiceStatus, Student, StudentDraft } from "@/lib/types";
-import { Button, Field, Input, Modal, Select, Textarea } from "./ui";
+import { Client, DailyRoute, DailyRouteDraft, PayFrequency, Payment, PaymentMethod, PaymentStatus, Route, ServiceStatus, Student, StudentDraft } from "@/lib/types";
+import { Button, ErrorBanner, Field, Input, Modal, SearchSelect, Select, Textarea } from "./ui";
 import { useMoneyInput } from "@/lib/hooks/useMoneyInput";
 
 function FormActions({ onCancel, loading, label }: { onCancel: () => void; loading: boolean; label: string }) {
@@ -203,13 +203,17 @@ export function ClientForm({
 }
 
 export interface PaymentFormResult {
+  clientName: string;
+  concept: string;
   date: string;
   method: PaymentMethod;
   period?: string;
   observation?: string;
   amount: number;
-  clientName?: string;
-  concept?: string;
+  status: PaymentStatus;
+  advance: boolean;
+  studentId?: string;
+  clientId?: string;
 }
 
 export function PaymentForm({
@@ -218,46 +222,172 @@ export function PaymentForm({
   onSaved,
   studentName,
   defaultAmount,
+  initial,
+  students = [],
+  clients = [],
 }: {
   open: boolean;
   onClose: () => void;
   onSaved: (result: PaymentFormResult) => void | Promise<void>;
   studentName?: string;
   defaultAmount?: number;
+  initial?: Payment;
+  students?: Student[];
+  clients?: Client[];
 }) {
+  if (!open) return null;
+  return (
+    <PaymentFormBody
+      onClose={onClose}
+      onSaved={onSaved}
+      studentName={studentName}
+      defaultAmount={defaultAmount}
+      initial={initial}
+      students={students}
+      clients={clients}
+    />
+  );
+}
+
+function PaymentFormBody({
+  onClose,
+  onSaved,
+  studentName,
+  defaultAmount,
+  initial,
+  students,
+  clients,
+}: {
+  onClose: () => void;
+  onSaved: (result: PaymentFormResult) => void | Promise<void>;
+  studentName?: string;
+  defaultAmount?: number;
+  initial?: Payment;
+  students: Student[];
+  clients: Client[];
+}) {
+  const isStudentMode = !!studentName;
+
+  const [recipient, setRecipient] = useState<"estudiante" | "cliente" | "otro">(
+    initial?.studentId ? "estudiante" : initial?.clientId ? "cliente" : isStudentMode ? "estudiante" : "otro"
+  );
+  const [studentId, setStudentId] = useState(initial?.studentId ?? "");
+  const [clientId, setClientId] = useState(initial?.clientId ?? "");
+  const [advance, setAdvance] = useState(initial?.advance ?? false);
+  const [status, setStatus] = useState<PaymentStatus>(initial?.status ?? "completado");
+  const [error, setError] = useState<string | null>(null);
+
   const { submit, loading } = useSubmit(async () => {
     const form = document.getElementById("payment-form") as HTMLFormElement;
     const fd = new FormData(form);
+
+    let resolvedName = "";
+    let resolvedStudentId: string | undefined;
+    let resolvedClientId: string | undefined;
+
+    if (isStudentMode) {
+      resolvedName = studentName ?? "";
+    } else if (recipient === "estudiante") {
+      const st = students.find((s) => s.id === studentId);
+      if (!st) return setError("Selecciona un estudiante.");
+      resolvedName = st.name;
+      resolvedStudentId = st.id;
+    } else if (recipient === "cliente") {
+      const cl = clients.find((c) => c.id === clientId);
+      if (!cl) return setError("Selecciona un cliente.");
+      resolvedName = cl.name;
+      resolvedClientId = cl.id;
+    } else {
+      resolvedName = String(fd.get("otherName") ?? "").trim();
+      if (!resolvedName) return setError("Escribe el nombre de la persona.");
+    }
+
+    const concept =
+      String(fd.get("concept") ?? "").trim() ||
+      (recipient === "estudiante" || isStudentMode ? "Transporte estudiantil" : "Pago");
     const period = String(fd.get("period") ?? "").trim();
     const observation = String(fd.get("observation") ?? "").trim();
+
+    setError(null);
     await onSaved({
-      clientName: String(fd.get("clientName") ?? "").trim(),
+      clientName: resolvedName,
+      concept,
       date: String(fd.get("date") ?? ""),
       method: String(fd.get("method") ?? "efectivo") as PaymentMethod,
+      amount: Number(fd.get("amount")) || 0,
+      status,
+      advance,
+      studentId: resolvedStudentId,
+      clientId: resolvedClientId,
       ...(period ? { period } : {}),
       ...(observation ? { observation } : {}),
-      amount: Number(fd.get("amount")) || 0,
-      concept: String(fd.get("concept") ?? "").trim() || undefined,
     });
   });
 
+  const studentOptions = students.map((s) => ({ value: s.id, label: s.school ? `${s.name} · ${s.school}` : s.name }));
+  const clientOptions = clients.map((c) => ({ value: c.id, label: c.name }));
+
   return (
-    <Modal open={open} onClose={onClose} title="Registrar pago">
+    <Modal open onClose={onClose} title={initial ? "Editar pago" : "Registrar pago"}>
       <form id="payment-form" onSubmit={submit} className="space-y-4">
-        <Field label={studentName ? "Estudiante" : "Cliente"}>
-          <Input name="clientName" defaultValue={studentName ?? ""} placeholder="Nombre" required readOnly={!!studentName} />
-        </Field>
-        {!studentName && (
-          <Field label="Concepto">
-            <Input name="concept" placeholder="Ej. Servicio Santiago → La Vega" required />
+        {isStudentMode ? (
+          <Field label="Estudiante">
+            <Input value={studentName ?? ""} readOnly />
           </Field>
+        ) : (
+          <>
+            <Field label="Destinatario">
+              <div className="grid grid-cols-3 gap-2">
+                {(["estudiante", "cliente", "otro"] as const).map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setRecipient(r)}
+                    className={`rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+                      recipient === r
+                        ? "bg-teal text-white shadow-sm"
+                        : "bg-white text-dark/70 border border-dark/10 hover:border-teal"
+                    }`}
+                  >
+                    {r === "estudiante" ? "Estudiante" : r === "cliente" ? "Cliente" : "Otro"}
+                  </button>
+                ))}
+              </div>
+            </Field>
+
+            {recipient === "estudiante" && (
+              <Field label="Estudiante">
+                <SearchSelect options={studentOptions} value={studentId} onChange={setStudentId} placeholder="Buscar estudiante…" />
+              </Field>
+            )}
+            {recipient === "cliente" && (
+              <Field label="Cliente">
+                <SearchSelect options={clientOptions} value={clientId} onChange={setClientId} placeholder="Buscar cliente…" />
+              </Field>
+            )}
+            {recipient === "otro" && (
+              <Field label="Nombre">
+                <Input
+                  name="otherName"
+                  defaultValue={initial && !initial.studentId && !initial.clientId ? initial.clientName : ""}
+                  placeholder="Nombre de la persona"
+                />
+              </Field>
+            )}
+          </>
         )}
+
+        <Field label="Concepto">
+          <Input
+            name="concept"
+            defaultValue={initial?.concept ?? ""}
+            placeholder="Ej. Mensualidad de octubre / Servicio Santiago → La Vega"
+          />
+        </Field>
+
         <div className="grid grid-cols-2 gap-3">
           <Field label="Periodo">
-            <Select name="period" defaultValue="2026-09">
-              <option value="2026-09">Septiembre 2026</option>
-              <option value="2026-10">Octubre 2026</option>
-            </Select>
+            <Input name="period" type="month" defaultValue={initial?.period ?? new Date().toISOString().slice(0, 7)} />
           </Field>
           <Field label="Monto (RD$)">
             <Input
@@ -266,26 +396,51 @@ export function PaymentForm({
               min={0}
               placeholder="0"
               required
-              defaultValue={defaultAmount ? String(defaultAmount) : ""}
+              defaultValue={initial ? String(initial.amount) : defaultAmount ? String(defaultAmount) : ""}
             />
           </Field>
         </div>
+
         <div className="grid grid-cols-2 gap-3">
           <Field label="Fecha">
-            <Input name="date" type="date" required />
+            <Input name="date" type="date" required defaultValue={initial?.date ?? new Date().toISOString().slice(0, 10)} />
           </Field>
           <Field label="Método de pago">
-            <Select name="method" defaultValue="efectivo">
+            <Select name="method" defaultValue={initial?.method ?? "efectivo"}>
               <option value="efectivo">Efectivo</option>
               <option value="transferencia">Transferencia</option>
               <option value="tarjeta">Tarjeta</option>
             </Select>
           </Field>
         </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Estado">
+            <Select value={status} onChange={(e) => setStatus(e.target.value as PaymentStatus)}>
+              <option value="completado">Completado</option>
+              <option value="pendiente">Pendiente</option>
+            </Select>
+          </Field>
+          <div className="flex items-end pb-1">
+            <label className="flex items-center gap-2 text-sm font-medium text-dark/80">
+              <input
+                type="checkbox"
+                checked={advance}
+                onChange={(e) => setAdvance(e.target.checked)}
+                className="h-5 w-5 rounded border-dark/20 accent-teal"
+              />
+              Pago por adelantado
+            </label>
+          </div>
+        </div>
+
         <Field label="Observación">
-          <Textarea name="observation" placeholder="Notas (opcional)" />
+          <Textarea name="observation" defaultValue={initial?.observation ?? ""} placeholder="Notas (opcional)" />
         </Field>
-        <FormActions onCancel={onClose} loading={loading} label="Registrar pago" />
+
+        {error && <ErrorBanner message={error} />}
+
+        <FormActions onCancel={onClose} loading={loading} label={initial ? "Guardar cambios" : "Registrar pago"} />
       </form>
     </Modal>
   );
@@ -365,7 +520,6 @@ function StudentFormInner({
         guardian: guardian.trim() || undefined,
         phone: phone.trim() || undefined,
         routeId: routeId || undefined,
-        paid: initial?.paid ?? false,
       });
     } finally {
       setLoading(false);

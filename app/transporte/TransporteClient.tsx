@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { Route, Student, StudentDraft } from "@/lib/types";
-import { formatMoney } from "@/lib/format";
+import { formatDateShort, formatMoney } from "@/lib/format";
 import { createRoute, updateRoute, createStudent, deleteStudent, markStudentPaid, updateStudent, quickPayStudent } from "@/lib/actions";
 import { StudentCard, SummaryCard } from "@/components/cards";
 import { Avatar, Button, Chip, EmptyState, Modal, Toast } from "@/components/ui";
@@ -64,6 +64,10 @@ export default function TransporteClient({
   const pendingStudents = students.filter((s) => !s.paid);
   const total = students.reduce((sum, s) => sum + s.monthlyFee, 0);
   const collected = students.filter((s) => s.paid).reduce((sum, s) => sum + s.monthlyFee, 0);
+
+  // La sección "Pagos pendientes" sustituye a la lista principal en el filtro "Pendientes"
+  const showPendingSection =
+    pendingStudents.length > 0 && filter === "pendiente" && selectedRouteId === "";
 
   const filtered = students.filter((s) => {
     // Filtro por ruta
@@ -194,7 +198,7 @@ export default function TransporteClient({
         </div>
       </div>
 
-      {pendingStudents.length > 0 && (filter === "todos" || filter === "pendiente") && selectedRouteId === "" && (
+      {showPendingSection && (
         <section>
           <h2 className="mb-3 text-lg font-bold">Pagos pendientes</h2>
           <div className="space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0">
@@ -210,6 +214,7 @@ export default function TransporteClient({
         </section>
       )}
 
+      {!showPendingSection && (
       <section>
         <h2 className="mb-3 text-lg font-bold">
           {selectedRouteId ? selectedRoute?.name : filter === "todos" ? "Todos los estudiantes" : filters.find((f) => f.value === filter)?.label}
@@ -238,6 +243,7 @@ export default function TransporteClient({
           </div>
         )}
       </section>
+      )}
 
       {/* Crear estudiante */}
       <StudentForm 
@@ -308,7 +314,12 @@ export default function TransporteClient({
                     {selected.route.name}
                   </span>
                 )}
-                {selected.paid ? <Chip tone="teal">Pagado</Chip> : <Chip tone="danger">Pendiente</Chip>}
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  {selected.paid ? <Chip tone="teal">Pagado</Chip> : <Chip tone="danger">Pendiente</Chip>}
+                  {selected.paid && selected.paidUntil && (
+                    <span className="text-xs text-dark/50">Pagado hasta {formatDateShort(selected.paidUntil)}</span>
+                  )}
+                </div>
               </div>
             </div>
 

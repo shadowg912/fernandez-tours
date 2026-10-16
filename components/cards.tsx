@@ -6,11 +6,25 @@ import { Avatar, Card, Chip, Money, StatusBadge } from "./ui";
 import { IconPhone } from "./icons";
 
 /* ---------- SummaryCard ---------- */
-export function SummaryCard({ value, label, accent = false }: { value: string; label: string; accent?: boolean }) {
+export function SummaryCard({
+  value,
+  label,
+  accent = false,
+  onClick,
+  hint,
+}: {
+  value: string;
+  label: string;
+  accent?: boolean;
+  onClick?: () => void;
+  hint?: string;
+}) {
   return (
-    <div
-      className={`flex-1 basis-auto min-w-[8.5rem] rounded-2xl shadow-sm p-4 border ${
-        accent ? "bg-gold/5 border-gold" : "bg-white border-dark/5"
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex-1 basis-auto min-w-[8.5rem] rounded-2xl shadow-sm p-4 border text-left transition-all hover:shadow-md active:scale-[.98] ${
+        accent ? "bg-gold/5 border-gold hover:border-gold" : "bg-white border-dark/5 hover:border-teal/40"
       }`}
     >
       <p
@@ -20,8 +34,9 @@ export function SummaryCard({ value, label, accent = false }: { value: string; l
       >
         {value}
       </p>
-      <p className="mt-1 text-xs md:text-sm leading-snug text-dark/60">{label}</p>
-    </div>
+      <p className="mt-1 text-sm md:text-base font-semibold leading-snug text-dark/70">{label}</p>
+      {hint && <p className="mt-0.5 text-[11px] leading-snug text-dark/45">{hint}</p>}
+    </button>
   );
 }
 
@@ -144,13 +159,6 @@ export function ClientCard({ client, onClick }: { client: Client; onClick?: () =
 
 /* ---------- StudentCard ---------- */
 
-function formatTime12h(time24: string): string {
-  const [h, m] = time24.split(":").map(Number);
-  const period = h >= 12 ? "PM" : "AM";
-  const hour = h % 12 === 0 ? 12 : h % 12;
-  return `${hour}:${String(m).padStart(2, "0")} ${period}`;
-}
-
 const frequencyLabel = { mensual: "Mensual", quincenal: "Quincenal", semanal: "Semanal" } as const;
 
 export function StudentCard({ 
@@ -173,9 +181,6 @@ export function StudentCard({
               {student.school && (
                 <p className="mt-1 text-sm text-dark/60 truncate">{student.school}</p>
               )}
-              <p className="mt-1 text-xs text-dark/50 truncate">
-                {formatTime12h(student.entryTime)} – {formatTime12h(student.exitTime)}
-              </p>
               {/* Pago y periodicidad */}
               <div className="mt-2 flex items-center gap-3 text-xs text-dark/60">
                 <span className="flex items-center gap-1 font-medium text-dark-teal">
@@ -192,8 +197,11 @@ export function StudentCard({
                 </span>
               </div>
             </div>
-            <div className="mt-3 flex items-center">
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               {student.paid ? <Chip tone="teal">Pagado</Chip> : <Chip tone="danger">Pendiente</Chip>}
+              {student.paid && student.paidUntil && (
+                <span className="text-xs text-dark/50">hasta {formatDateShort(student.paidUntil)}</span>
+              )}
             </div>
           </div>
 
@@ -223,8 +231,20 @@ export function StudentCard({
 }
 
 /* ---------- PaymentCard ---------- */
-export function PaymentCard({ payment }: { payment: Payment }) {
+export function PaymentCard({
+  payment,
+  onEdit,
+  onDelete,
+  onMarkPaid,
+}: {
+  payment: Payment;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  onMarkPaid?: () => void;
+}) {
   const methodLabel = { efectivo: "Efectivo", transferencia: "Transferencia", tarjeta: "Tarjeta" }[payment.method];
+  const linkLabel = payment.studentId ? "Estudiante" : payment.clientId ? "Cliente" : null;
+  const hasActions = Boolean(onEdit || onDelete || onMarkPaid);
   return (
     <Card className="p-4">
       <div className="flex items-start justify-between gap-3">
@@ -234,6 +254,12 @@ export function PaymentCard({ payment }: { payment: Payment }) {
           <p className="mt-0.5 text-xs text-dark/50">
             {formatDateShort(payment.date)} · {methodLabel}
           </p>
+          {(payment.advance || linkLabel) && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              {payment.advance && <Chip tone="gold">Adelantado</Chip>}
+              {linkLabel && <Chip>{linkLabel}</Chip>}
+            </div>
+          )}
         </div>
         <div className="text-right shrink-0">
           <Money amount={payment.amount} className="text-dark-teal" />
@@ -242,6 +268,37 @@ export function PaymentCard({ payment }: { payment: Payment }) {
           </div>
         </div>
       </div>
+      {hasActions && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {payment.status === "pendiente" && onMarkPaid && (
+            <button
+              type="button"
+              onClick={onMarkPaid}
+              className="rounded-lg bg-teal px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-teal/90 active:scale-[.98]"
+            >
+              Marcar como pagado
+            </button>
+          )}
+          {onEdit && (
+            <button
+              type="button"
+              onClick={onEdit}
+              className="rounded-lg border border-dark/15 bg-white px-3 py-2 text-xs font-semibold text-dark transition-colors hover:border-teal hover:text-dark-teal"
+            >
+              Editar
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={onDelete}
+              className="rounded-lg border border-orange/40 bg-orange/10 px-3 py-2 text-xs font-semibold text-orange transition-colors hover:bg-orange/20"
+            >
+              Eliminar
+            </button>
+          )}
+        </div>
+      )}
     </Card>
   );
 }

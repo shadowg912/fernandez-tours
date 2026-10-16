@@ -42,7 +42,8 @@ export interface Student {
   days: string[];
   monthlyFee: number;
   frequency: PayFrequency;
-  paid: boolean;
+  paid: boolean;          // derivado de paid_until (cobertura vigente)
+  paidUntil?: string;     // fecha hasta la que está cubierto (YYYY-MM-DD)
   guardian?: string;      // opcional: representante
   phone?: string;         // opcional: teléfono del representante
   routeId?: string;       // FK a routes
@@ -60,6 +61,11 @@ export interface Payment {
   amount: number;
   method: PaymentMethod;
   status: PaymentStatus;
+  period?: string;
+  observation?: string;
+  studentId?: string;   // vínculo a students (opcional)
+  clientId?: string;    // vínculo a clients (opcional)
+  advance: boolean;     // pago por adelantado
 }
 
 export type ExecutionStatus = "pending" | "done" | "skipped";
@@ -89,7 +95,7 @@ export interface DailyRouteWithExecutions extends DailyRoute {
   totalSkipped: number;
 }
 
-export type StudentDraft = Omit<Student, "id">;
+export type StudentDraft = Omit<Student, "id" | "paid" | "paidUntil">;
 export type ServiceDraft = Omit<Service, "id"> & { observations?: string };
 export type ClientDraft = Omit<Client, "id" | "lastService" | "balance">;
 export interface PaymentDraft {
@@ -101,4 +107,7 @@ export interface PaymentDraft {
   status: PaymentStatus;
   period?: string;
   observation?: string;
+  studentId?: string;
+  clientId?: string;
+  advance: boolean;
 }

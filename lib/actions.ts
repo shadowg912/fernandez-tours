@@ -13,9 +13,9 @@ async function getQuery() {
 export async function createStudent(d: StudentDraft) {
   const query = await getQuery();
   await query(
-    `insert into students (name, school, address, entry_time, exit_time, days, monthly_fee, frequency, guardian, phone, paid, route_id)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-    [d.name, d.school ?? null, d.address ?? null, d.entryTime, d.exitTime, d.days, d.monthlyFee, d.frequency, d.guardian ?? null, d.phone ?? null, d.paid, d.routeId ?? null]
+    `insert into students (name, school, address, entry_time, exit_time, days, monthly_fee, frequency, guardian, phone, route_id)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+    [d.name, d.school ?? null, d.address ?? null, d.entryTime, d.exitTime, d.days, d.monthlyFee, d.frequency, d.guardian ?? null, d.phone ?? null, d.routeId ?? null]
   );
   revalidatePath("/transporte");
 }
@@ -24,9 +24,12 @@ export async function updateStudent(id: string, d: StudentDraft) {
   const query = await getQuery();
   await query(
     `update students set name=$1, school=$2, address=$3, entry_time=$4, exit_time=$5, days=$6, monthly_fee=$7,
-     frequency=$8, guardian=$9, phone=$10, paid=$11, route_id=$12 where id=$13`,
-    [d.name, d.school ?? null, d.address ?? null, d.entryTime, d.exitTime, d.days, d.monthlyFee, d.frequency, d.guardian ?? null, d.phone ?? null, d.paid, d.routeId ?? null, id]
+     frequency=$8, guardian=$9, phone=$10, route_id=$11 where id=$12`,
+    [d.name, d.school ?? null, d.address ?? null, d.entryTime, d.exitTime, d.days, d.monthlyFee, d.frequency, d.guardian ?? null, d.phone ?? null, d.routeId ?? null, id]
   );
+  // Recalcular cobertura solo si hay pagos registrados (no borrar cobertura legacy).
+  const hasPayments = await query("select 1 from payments where student_id=$1 and status='completado' limit 1", [id]);
+  if (hasPayments.length > 0) await query("select refresh_student_paid_until($1)", [id]);
   revalidatePath("/transporte");
 }
 
@@ -38,10 +41,9 @@ export async function deleteStudent(id: string) {
 
 export async function markStudentPaid(student: { id: string; name: string; monthlyFee: number }, payment: { date: string; method: string; period?: string; observation?: string }) {
   const query = await getQuery();
-  await query("update students set paid=true where id=$1", [student.id]);
   await query(
-    `insert into payments (client_name, date, concept, amount, method, status, period, observation)
-     values ($1,$2,$3,$4,$5,'completado',$6,$7)`,
+    `insert into payments (client_name, date, concept, amount, method, status, period, observation, student_id)
+     values ($1,$2,$3,$4,$5,'completado',$6,$7,$8)`,
     [
       student.name,
       payment.date,
@@ -50,10 +52,13 @@ export async function markStudentPaid(student: { id: string; name: string; month
       payment.method,
       payment.period ?? null,
       payment.observation ?? null,
+      student.id,
     ]
   );
+  await query("select refresh_student_paid_until($1)", [student.id]);
   revalidatePath("/transporte");
   revalidatePath("/pagos");
+  revalidatePath("/");
 }
 
 export async function quickPayStudent(id: string) {
@@ -62,15 +67,16 @@ export async function quickPayStudent(id: string) {
   const rows = await query<{ monthly_fee: number; name: string }>("select monthly_fee, name from students where id=$1", [id]);
   if (rows.length === 0) throw new Error("Estudiante no encontrado");
   const student = rows[0];
-  
-  await query("update students set paid=true where id=$1", [id]);
+
   await query(
-    `insert into payments (client_name, date, concept, amount, method, status)
-     values ($1,$2,$3,$4,'efectivo','completado')`,
-    [student.name, today, `Transporte estudiantil — pago rápido`, student.monthly_fee]
+    `insert into payments (client_name, date, concept, amount, method, status, student_id)
+     values ($1,$2,$3,$4,'efectivo','completado',$5)`,
+    [student.name, today, `Transporte estudiantil — pago rápido`, student.monthly_fee, id]
   );
+  await query("select refresh_student_paid_until($1)", [id]);
   revalidatePath("/transporte");
   revalidatePath("/pagos");
+  revalidatePath("/");
 }
 
 /* ---------- Servicios ---------- */
@@ -123,12 +129,56 @@ export async function createClient(d: ClientDraft) {
 export async function createPayment(d: PaymentDraft) {
   const query = await getQuery();
   await query(
-    `insert into payments (client_name, date, concept, amount, method, status, period, observation)
-     values ($1,$2,$3,$4,$5,$6,$7,$8)`,
-    [d.clientName, d.date, d.concept, d.amount, d.method, d.status, d.period ?? null, d.observation ?? null]
+    `insert into payments (client_name, date, concept, amount, method, status, period, observation, student_id, client_id, advance)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+    [d.clientName, d.date, d.concept, d.amount, d.method, d.status, d.period ?? null, d.observation ?? null, d.studentId ?? null, d.clientId ?? null, d.advance ?? false]
   );
+  if (d.studentId) await query("select refresh_student_paid_until($1)", [d.studentId]);
   revalidatePath("/pagos");
   revalidatePath("/");
+  revalidatePath("/transporte");
+}
+
+export async function updatePayment(id: string, d: PaymentDraft) {
+  const query = await getQuery();
+  const prev = await query<{ student_id: string | null }>("select student_id from payments where id=$1", [id]);
+  const prevStudent = prev[0]?.student_id ?? null;
+  await query(
+    `update payments
+     set client_name=$1, date=$2, concept=$3, amount=$4, method=$5, status=$6, period=$7, observation=$8,
+         student_id=$9, client_id=$10, advance=$11
+     where id=$12`,
+    [d.clientName, d.date, d.concept, d.amount, d.method, d.status, d.period ?? null, d.observation ?? null, d.studentId ?? null, d.clientId ?? null, d.advance ?? false, id]
+  );
+  const affected = new Set<string>();
+  if (prevStudent) affected.add(prevStudent);
+  if (d.studentId) affected.add(d.studentId);
+  for (const sid of affected) await query("select refresh_student_paid_until($1)", [sid]);
+  revalidatePath("/pagos");
+  revalidatePath("/");
+  revalidatePath("/transporte");
+}
+
+export async function deletePayment(id: string) {
+  const query = await getQuery();
+  const prev = await query<{ student_id: string | null }>("select student_id from payments where id=$1", [id]);
+  const prevStudent = prev[0]?.student_id ?? null;
+  await query("delete from payments where id=$1", [id]);
+  if (prevStudent) await query("select refresh_student_paid_until($1)", [prevStudent]);
+  revalidatePath("/pagos");
+  revalidatePath("/");
+  revalidatePath("/transporte");
+}
+
+export async function markPaymentPaid(id: string) {
+  const query = await getQuery();
+  const rows = await query<{ student_id: string | null }>("select student_id from payments where id=$1", [id]);
+  const studentId = rows[0]?.student_id ?? null;
+  await query("update payments set status='completado' where id=$1", [id]);
+  if (studentId) await query("select refresh_student_paid_until($1)", [studentId]);
+  revalidatePath("/pagos");
+  revalidatePath("/");
+  revalidatePath("/transporte");
 }
 
 /* ---------- Rutas (estudiantes) ---------- */
