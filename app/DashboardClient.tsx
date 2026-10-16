@@ -5,13 +5,56 @@ import Link from "next/link";
 import { DashboardData } from "@/lib/queries";
 import { completeService } from "@/lib/actions";
 import { Service } from "@/lib/types";
-import { formatDateLong, formatMoney } from "@/lib/format";
+import { formatDateLong, formatDateShort, formatMoney } from "@/lib/format";
 import { SummaryCard, ServiceCard } from "@/components/cards";
 import { Avatar, Button, Card, EmptyState, Modal, StatusBadge, Toast } from "@/components/ui";
 import { IconBell, IconCalendar, IconChevronRight, IconCheck, IconUsers } from "@/components/icons";
 
+type DetailView = "today" | "completed" | "upcoming" | "students";
+
+const detailTitles: Record<DetailView, string> = {
+  today: "Servicios de hoy",
+  completed: "Servicios realizados",
+  upcoming: "Próximos servicios",
+  students: "Estudiantes con pago pendiente",
+};
+
+/* Fila compacta de servicio para los modales de detalle */
+function ServiceRow({ service, onClick }: { service: Service; onClick?: () => void }) {
+  const inner = (
+    <div className="flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold">{service.clientName}</p>
+        <p className="truncate text-xs text-dark/60">
+          {service.origin} → {service.destination}
+        </p>
+        <p className="text-xs text-dark/50">
+          {formatDateShort(service.date)} · {service.time}
+        </p>
+      </div>
+      <div className="shrink-0 text-right">
+        <p className="text-sm font-bold text-gold-deep">{formatMoney(service.price)}</p>
+        <div className="mt-1">
+          <StatusBadge status={service.status} />
+        </div>
+      </div>
+    </div>
+  );
+
+  const base = "w-full rounded-xl border border-dark/5 bg-white p-3 text-left transition-colors";
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={`${base} hover:border-teal/40 hover:shadow-sm`}>
+        {inner}
+      </button>
+    );
+  }
+  return <div className={base}>{inner}</div>;
+}
+
 export default function DashboardClient({ data }: { data: DashboardData }) {
   const [selected, setSelected] = useState<Service | null>(null);
+  const [detail, setDetail] = useState<DetailView | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -28,6 +71,10 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
       setToast("Servicio marcado como completado");
     });
   };
+
+  const weekTotal = data.completedWeek.reduce((sum, s) => sum + s.price, 0);
+  const monthTotal = data.completedMonth.reduce((sum, s) => sum + s.price, 0);
+  const studentsPendingAmount = data.pendingStudents.reduce((sum, s) => sum + s.monthlyFee, 0);
 
   return (
     <div className="space-y-6">
@@ -75,12 +122,17 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
         </Link>
       </section>
 
-      {/* Resumen */}
+      {/* Resumen: cada tarjeta abre su detalle */}
       <section className="flex flex-wrap gap-3">
-        <SummaryCard value={String(data.todayServices.length)} label="Servicios hoy" />
-        <SummaryCard value={String(data.upcomingCount)} label="Próximos servicios" />
-        <SummaryCard value={String(data.clientsCount)} label="Clientes" />
-        <SummaryCard value={formatMoney(data.pendingMoney)} label="Pendiente" accent />
+        <SummaryCard value={String(data.todayServices.length)} label="Servicios hoy" onClick={() => setDetail("today")} />
+        <SummaryCard value={String(data.completedMonth.length)} label="Servicios realizados" onClick={() => setDetail("completed")} />
+        <SummaryCard value={String(data.upcomingMonth.length)} label="Próximos servicios" onClick={() => setDetail("upcoming")} />
+        <SummaryCard
+          value={String(data.pendingStudents.length)}
+          label="Estudiantes por pagar"
+          accent
+          onClick={() => setDetail("students")}
+        />
       </section>
 
       {/* Servicios de hoy */}
@@ -102,6 +154,92 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
         )}
       </section>
 
+      {/* Modal de detalle de reporte */}
+      <Modal open={detail !== null && selected === null} onClose={() => setDetail(null)} title={detail ? detailTitles[detail] : ""}>
+        {detail === "today" &&
+          (data.todayServices.length === 0 ? (
+            <EmptyState title="No tienes servicios programados para hoy." />
+          ) : (
+            <div className="space-y-2">
+              {data.todayServices.map((s) => (
+                <ServiceRow key={s.id} service={s} onClick={() => setSelected(s)} />
+              ))}
+            </div>
+          ))}
+
+        {detail === "completed" &&
+          (data.completedMonth.length === 0 ? (
+            <EmptyState title="Aún no hay servicios completados este mes." />
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <h3 className="font-semibold">Esta semana</h3>
+                  <span className="text-sm text-dark/60">
+                    {data.completedWeek.length} · {formatMoney(weekTotal)}
+                  </span>
+                </div>
+                {data.completedWeek.length === 0 ? (
+                  <p className="text-sm text-dark/50">Sin servicios completados esta semana.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {data.completedWeek.map((s) => (
+                      <ServiceRow key={s.id} service={s} />
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="border-t border-dark/10 pt-4">
+                <div className="mb-2 flex items-center justify-between">
+                  <h3 className="font-semibold">Este mes</h3>
+                  <span className="text-sm text-dark/60">
+                    {data.completedMonth.length} · {formatMoney(monthTotal)}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {data.completedMonth.map((s) => (
+                    <ServiceRow key={s.id} service={s} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+
+        {detail === "upcoming" &&
+          (data.upcomingMonth.length === 0 ? (
+            <EmptyState title="No hay servicios confirmados próximos este mes." />
+          ) : (
+            <div className="space-y-2">
+              {data.upcomingMonth.map((s) => (
+                <ServiceRow key={s.id} service={s} onClick={() => setSelected(s)} />
+              ))}
+            </div>
+          ))}
+
+        {detail === "students" &&
+          (data.pendingStudents.length === 0 ? (
+            <EmptyState title="Todos los estudiantes están al día." />
+          ) : (
+            <div className="space-y-2">
+              {data.pendingStudents.map((st) => (
+                <div key={st.id} className="w-full rounded-xl border border-dark/5 bg-white p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">{st.name}</p>
+                      <p className="truncate text-xs text-dark/50">{st.school ?? st.address ?? "—"}</p>
+                    </div>
+                    <p className="shrink-0 text-sm font-bold text-orange">{formatMoney(st.monthlyFee)}</p>
+                  </div>
+                </div>
+              ))}
+              <div className="flex items-center justify-between rounded-xl bg-orange/10 px-3 py-2 text-sm">
+                <span className="font-semibold text-dark/70">Total pendiente</span>
+                <span className="font-bold text-orange">{formatMoney(studentsPendingAmount)}</span>
+              </div>
+            </div>
+          ))}
+      </Modal>
+
       {/* Detalle del servicio */}
       <Modal open={selected !== null} onClose={() => setSelected(null)} title="Detalle del servicio">
         {selected && (
@@ -112,6 +250,7 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
             </div>
             <div className="rounded-2xl bg-white p-4 space-y-2 text-sm border border-dark/5">
               <p><span className="font-semibold">Cliente:</span> {selected.clientName}</p>
+              <p><span className="font-semibold">Fecha:</span> {formatDateShort(selected.date)}</p>
               <p><span className="font-semibold">Ruta:</span> {selected.origin} → {selected.destination}</p>
               <p><span className="font-semibold">Pasajeros:</span> {selected.passengers}</p>
               <p><span className="font-semibold">Precio:</span> <span className="text-gold-deep font-bold">{formatMoney(selected.price)}</span></p>

@@ -117,27 +117,47 @@ export async function getPayments(): Promise<Payment[]> {
 export interface DashboardData {
   today: string;
   todayServices: Service[];
-  upcomingCount: number;
-  clientsCount: number;
-  pendingMoney: number;
+  /** Servicios completados en la semana actual (lunes a domingo). */
+  completedWeek: Service[];
+  /** Servicios completados en el mes actual. */
+  completedMonth: Service[];
+  /** Servicios confirmados próximos dentro del mes actual (desde hoy). */
+  upcomingMonth: Service[];
+  /** Estudiantes con pago pendiente. */
+  pendingStudents: Student[];
 }
 
 export async function getDashboardData(): Promise<DashboardData> {
   const [todayRows] = await query<{ t: string }>("select to_char(current_date, 'YYYY-MM-DD') as t");
   const today = todayRows.t;
 
-  const todayServices = (await query("select * from services where date = $1 order by time", [today])).map(mapService);
+  const [todayServices, completedWeek, completedMonth, upcomingMonth, pendingStudents] = await Promise.all([
+    query("select * from services where date = $1 order by time", [today]).then((r) => r.map(mapService)),
+    query(
+      `select * from services
+       where status = 'completado'
+         and date >= date_trunc('week', current_date)::date
+         and date < (date_trunc('week', current_date) + interval '7 days')::date
+       order by date, time`
+    ).then((r) => r.map(mapService)),
+    query(
+      `select * from services
+       where status = 'completado'
+         and date >= date_trunc('month', current_date)::date
+         and date < (date_trunc('month', current_date) + interval '1 month')::date
+       order by date, time`
+    ).then((r) => r.map(mapService)),
+    query(
+      `select * from services
+       where status = 'confirmado'
+         and date >= current_date
+         and date < (date_trunc('month', current_date) + interval '1 month')::date
+       order by date, time`
+    ).then((r) => r.map(mapService)),
+    query("select * from students where paid = false order by name").then((r) => r.map(mapStudent)),
+  ]);
 
-  const [{ n: upcomingCount }] = await query<{ n: number }>(
-    "select count(*)::int as n from services where date > $1 and status in ('confirmado','pendiente_confirmacion')",
-    [today]
-  );
-  const [{ n: clientsCount }] = await query<{ n: number }>("select count(*)::int as n from clients");
-  const [{ n: pendingMoney }] = await query<{ n: number }>(
-    "select coalesce(sum(price), 0)::int as n from services where status = 'pendiente_confirmacion'"
-  );
-
-  return { today, todayServices, upcomingCount, clientsCount, pendingMoney };
+  return { today, todayServices, completedWeek, completedMonth, upcomingMonth, pendingStudents };
 }
 
 export async function getRoutes(): Promise<Route[]> {

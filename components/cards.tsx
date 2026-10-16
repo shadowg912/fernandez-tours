@@ -6,11 +6,23 @@ import { Avatar, Card, Chip, Money, StatusBadge } from "./ui";
 import { IconPhone } from "./icons";
 
 /* ---------- SummaryCard ---------- */
-export function SummaryCard({ value, label, accent = false }: { value: string; label: string; accent?: boolean }) {
+export function SummaryCard({
+  value,
+  label,
+  accent = false,
+  onClick,
+}: {
+  value: string;
+  label: string;
+  accent?: boolean;
+  onClick?: () => void;
+}) {
   return (
-    <div
-      className={`flex-1 basis-auto min-w-[8.5rem] rounded-2xl shadow-sm p-4 border ${
-        accent ? "bg-gold/5 border-gold" : "bg-white border-dark/5"
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex-1 basis-auto min-w-[8.5rem] rounded-2xl shadow-sm p-4 border text-left transition-all hover:shadow-md active:scale-[.98] ${
+        accent ? "bg-gold/5 border-gold hover:border-gold" : "bg-white border-dark/5 hover:border-teal/40"
       }`}
     >
       <p
@@ -21,7 +33,7 @@ export function SummaryCard({ value, label, accent = false }: { value: string; l
         {value}
       </p>
       <p className="mt-1 text-xs md:text-sm leading-snug text-dark/60">{label}</p>
-    </div>
+    </button>
   );
 }
 
