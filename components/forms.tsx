@@ -1,9 +1,10 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { Client, DailyRoute, DailyRouteDraft, PayFrequency, Payment, PaymentMethod, PaymentStatus, Route, ServiceStatus, Student, StudentDraft } from "@/lib/types";
+import { Client, DailyRoute, DailyRouteDraft, PayFrequency, Payment, PaymentMethod, PaymentStatus, Route, RoutePaymentDraft, ServiceStatus, Student, StudentDraft } from "@/lib/types";
 import { Button, ErrorBanner, Field, Input, Modal, SearchSelect, Select, Textarea } from "./ui";
 import { useMoneyInput } from "@/lib/hooks/useMoneyInput";
+import { formatMoney } from "@/lib/format";
 
 function FormActions({ onCancel, loading, label }: { onCancel: () => void; loading: boolean; label: string }) {
   return (
@@ -802,6 +803,130 @@ function DailyRouteFormInner({
           />
         </Field>
         <FormActions onCancel={onClose} loading={submitLoading} label={initial ? "Guardar cambios" : "Crear ruta"} />
+      </form>
+    </Modal>
+  );
+}
+
+export function RoutePaymentForm({
+  open,
+  onClose,
+  onSaved,
+  routes,
+  initialRouteId,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSaved: (draft: RoutePaymentDraft) => void | Promise<void>;
+  routes: DailyRoute[];
+  initialRouteId?: string;
+}) {
+  if (!open) return null;
+  return (
+    <RoutePaymentFormInner
+      key={initialRouteId ?? "new"}
+      onClose={onClose}
+      onSaved={onSaved}
+      routes={routes}
+      initialRouteId={initialRouteId}
+    />
+  );
+}
+
+function RoutePaymentFormInner({
+  onClose,
+  onSaved,
+  routes,
+  initialRouteId,
+}: {
+  onClose: () => void;
+  onSaved: (draft: RoutePaymentDraft) => void | Promise<void>;
+  routes: DailyRoute[];
+  initialRouteId?: string;
+}) {
+  const [routeId, setRouteId] = useState(initialRouteId ?? "");
+  const [days, setDays] = useState("");
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
+  const [method, setMethod] = useState<PaymentMethod>("efectivo");
+  const [observation, setObservation] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const route = routes.find((r) => r.id === routeId);
+  const fee = route?.dailyFee ?? 0;
+  const daysNum = Math.floor(Number(days) || 0);
+  const total = fee * daysNum;
+
+  const { submit, loading } = useSubmit(async () => {
+    if (!routeId) return setError("Selecciona una ruta.");
+    if (daysNum <= 0) return setError("Indica al menos 1 día a pagar.");
+    setError(null);
+    const obs = observation.trim();
+    await onSaved({
+      routeId,
+      daysPaid: daysNum,
+      paymentDate,
+      method,
+      ...(obs ? { observation: obs } : {}),
+    });
+  });
+
+  return (
+    <Modal open onClose={onClose} title="Registrar pago de ruta">
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="Ruta a cobrar">
+          <Select value={routeId} onChange={(e) => setRouteId(e.target.value)}>
+            <option value="">— Selecciona una ruta —</option>
+            {routes.map((r) => (
+              <option key={r.id} value={r.id}>{r.name}</option>
+            ))}
+          </Select>
+        </Field>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Tarifa por día">
+            <Input value={route ? formatMoney(fee) : "—"} readOnly tabIndex={-1} />
+          </Field>
+          <Field label="Días a pagar">
+            <Input
+              type="number"
+              min={1}
+              step={1}
+              value={days}
+              onChange={(e) => setDays(e.target.value)}
+              placeholder="Ej. 21"
+              required
+            />
+          </Field>
+        </div>
+
+        <div className="rounded-xl border border-dark/10 bg-white px-4 py-3">
+          <p className="text-sm text-dark/60">Total a pagar</p>
+          <p className="text-2xl font-bold tabular-nums text-dark-teal">{formatMoney(total)}</p>
+          <p className="mt-0.5 text-xs text-dark/50">
+            {daysNum > 0 ? `${daysNum} día${daysNum === 1 ? "" : "s"} × ${formatMoney(fee)}` : "Ingresa los días a pagar"}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Fecha de pago">
+            <Input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} required />
+          </Field>
+          <Field label="Método de pago">
+            <Select value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod)}>
+              <option value="efectivo">Efectivo</option>
+              <option value="transferencia">Transferencia</option>
+              <option value="tarjeta">Tarjeta</option>
+            </Select>
+          </Field>
+        </div>
+
+        <Field label="Observación">
+          <Textarea value={observation} onChange={(e) => setObservation(e.target.value)} placeholder="Notas (opcional)" />
+        </Field>
+
+        {error && <ErrorBanner message={error} />}
+
+        <FormActions onCancel={onClose} loading={loading} label="Registrar pago" />
       </form>
     </Modal>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { Client, DailyRoute, Payment, RouteExecution, Service, Student } from "@/lib/types";
+import { Client, DailyRoute, DailyRouteStats, Payment, RouteExecution, Service, Student } from "@/lib/types";
 import { formatDateShort, formatMoney } from "@/lib/format";
 import { Avatar, Card, Chip, Money, StatusBadge } from "./ui";
 import { IconPhone } from "./icons";
@@ -243,7 +243,10 @@ export function PaymentCard({
   onMarkPaid?: () => void;
 }) {
   const methodLabel = { efectivo: "Efectivo", transferencia: "Transferencia", tarjeta: "Tarjeta" }[payment.method];
-  const linkLabel = payment.studentId ? "Estudiante" : payment.clientId ? "Cliente" : null;
+  const isRoutePayment = payment.source === "route_payment" || Boolean(payment.routeId);
+  const linkLabel = isRoutePayment
+    ? `Ruta diaria · ${payment.daysPaid ?? 0} día${(payment.daysPaid ?? 0) === 1 ? "" : "s"}`
+    : payment.studentId ? "Estudiante" : payment.clientId ? "Cliente" : null;
   const hasActions = Boolean(onEdit || onDelete || onMarkPaid);
   return (
     <Card className="p-4">
@@ -257,7 +260,7 @@ export function PaymentCard({
           {(payment.advance || linkLabel) && (
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               {payment.advance && <Chip tone="gold">Adelantado</Chip>}
-              {linkLabel && <Chip>{linkLabel}</Chip>}
+              {linkLabel && <Chip tone={isRoutePayment ? "teal" : "default"}>{linkLabel}</Chip>}
             </div>
           )}
         </div>
@@ -322,19 +325,21 @@ export function DailyRouteCard({
   onEdit, 
   onDelete, 
   onCopyToNextMonth,
-  summary 
+  stats 
 }: { 
   route: DailyRoute; 
   onClick?: () => void; 
   onEdit?: () => void; 
   onDelete?: () => void;
   onCopyToNextMonth?: () => void;
-  summary?: { totalCollected: number; executionCount: number } | null;
+  stats?: DailyRouteStats | null;
 }) {
   const daysLabel = route.daysOfWeek.map(d => {
     const labels: Record<string, string> = { Mon: "Lun", Tue: "Mar", Wed: "Mié", Thu: "Jue", Fri: "Vie", Sat: "Sáb", Sun: "Dom" };
     return labels[d] || d;
   }).join(" · ");
+
+  const pendingDays = stats?.pendingDays ?? 0;
 
   return (
     <div className="cursor-pointer" onClick={onClick}>
@@ -346,10 +351,31 @@ export function DailyRouteCard({
               {daysLabel}  •  Ventana: {route.generationWindowDays} días
             </p>
             <p className="mt-1 text-xs text-dark/50">Tarifa: {formatMoney(route.dailyFee)}/día</p>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <span className="inline-flex items-center rounded-full bg-teal/10 px-2.5 py-0.5 text-[11px] font-semibold text-dark-teal">
+                {stats?.serviceDays ?? 0} hechos
+              </span>
+              <span className="inline-flex items-center rounded-full bg-dark/8 px-2.5 py-0.5 text-[11px] font-semibold text-dark/70">
+                {stats?.paidDays ?? 0} pagados
+              </span>
+              {pendingDays > 0 ? (
+                <span className="inline-flex items-center rounded-full bg-orange/15 px-2.5 py-0.5 text-[11px] font-semibold text-orange">
+                  {pendingDays} por pagar
+                </span>
+              ) : pendingDays < 0 ? (
+                <span className="inline-flex items-center rounded-full bg-gold/15 px-2.5 py-0.5 text-[11px] font-semibold text-gold-deep">
+                  {Math.abs(pendingDays)} prepagados
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-full bg-green/15 px-2.5 py-0.5 text-[11px] font-semibold text-green">
+                  Al día
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex flex-col items-end gap-2 shrink-0">
             <div className="text-right">
-              <p className="text-lg font-bold text-dark-teal">{summary ? formatMoney(summary.totalCollected) : "RD$ 0"}</p>
+              <p className="text-lg font-bold text-dark-teal">{formatMoney(stats?.totalCollected ?? 0)}</p>
               <p className="text-xs text-dark/50">Total cobrado</p>
             </div>
             <div className="flex gap-1.5">
@@ -379,11 +405,9 @@ export function DailyRouteCard({
 /* ---------- RouteExecutionDay ---------- */
 export function RouteExecutionDay({ 
   execution, 
-  dailyFee, 
   onStatusChange 
 }: { 
   execution: RouteExecution; 
-  dailyFee: number; 
   onStatusChange: (date: string, newStatus: RouteExecution["status"]) => void;
 }) {
   const isToday = execution.executionDate === new Date().toISOString().slice(0, 10);
@@ -409,9 +433,6 @@ export function RouteExecutionDay({
         <span className="text-xs text-dark/50 capitalize">{dayName}</span>
         <span className={`mt-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${executionStatusColor[execution.status]}`}>
           {executionStatusLabel[execution.status]}
-        </span>
-        <span className="mt-1 text-xs font-medium text-gold-deep">
-          {execution.status === "done" ? formatMoney(dailyFee) : "RD$ 0"}
         </span>
       </div>
       {isToday && (

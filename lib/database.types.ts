@@ -1,4 +1,4 @@
-import { Client, DailyRoute, ExecutionStatus, Payment, PayFrequency, PaymentMethod, PaymentStatus, Route, RouteExecution, Service, ServiceStatus, Student } from "./types";
+import { Client, DailyRoute, ExecutionStatus, Payment, PayFrequency, PaymentMethod, PaymentStatus, Route, RouteExecution, RoutePayment, Service, ServiceStatus, Student } from "./types";
 
 /**
  * Mapa de tablas de Supabase tipado con las interfaces del dominio.
@@ -10,6 +10,7 @@ export interface Database {
       clients: Table<Client>;
       daily_routes: Table<DailyRoute>;
       route_executions: Table<RouteExecution>;
+      route_payments: Table<RoutePayment>;
       services: Table<Service>;
       students: Table<Student>;
       payments: Table<Payment>;

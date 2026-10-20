@@ -5,6 +5,7 @@ import NavShell from "@/components/NavShell";
 export const metadata: Metadata = {
   title: "Fernández Tours",
   description: "Sistema de gestión de transporte y tours",
+  icons: { icon: "/logo.svg" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

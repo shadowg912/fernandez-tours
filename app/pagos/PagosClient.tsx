@@ -203,15 +203,19 @@ export default function PagosClient({
         </p>
       ) : (
         <div className="space-y-3 md:grid md:grid-cols-2 xl:grid-cols-3 md:gap-3 md:space-y-0">
-          {list.map((p) => (
-            <PaymentCard
-              key={p.id}
-              payment={p}
-              onEdit={() => { setEditing(p); setFormOpen(true); }}
-              onDelete={() => setDeleting(p)}
-              onMarkPaid={() => onMarkPaid(p)}
-            />
-          ))}
+          {list.map((p) => {
+            // Los pagos de ruta son solo lectura: se editan desde /rutas.
+            const isRoutePayment = p.source === "route_payment" || Boolean(p.routeId);
+            return (
+              <PaymentCard
+                key={`${p.source ?? "payment"}-${p.id}`}
+                payment={p}
+                onEdit={isRoutePayment ? undefined : () => { setEditing(p); setFormOpen(true); }}
+                onDelete={isRoutePayment ? undefined : () => setDeleting(p)}
+                onMarkPaid={isRoutePayment ? undefined : () => onMarkPaid(p)}
+              />
+            );
+          })}
         </div>
       )}
 
