@@ -79,11 +79,11 @@ function mapRouteExecution(r: Row): RouteExecution {
     routeId: String(r.route_id),
     executionDate: toDateString(r.execution_date),
     status: String(r.status) as RouteExecution["status"],
-    amountCollected: Number(r.amount_collected),
   };
 }
 
 function mapPayment(r: Row): Payment {
+  const source = r.source == null ? "payment" : (String(r.source) as Payment["source"]);
   return {
     id: String(r.id),
     clientName: String(r.client_name),
@@ -97,6 +97,9 @@ function mapPayment(r: Row): Payment {
     studentId: r.student_id == null ? undefined : String(r.student_id),
     clientId: r.client_id == null ? undefined : String(r.client_id),
     advance: Boolean(r.advance),
+    source,
+    routeId: r.route_id == null ? undefined : String(r.route_id),
+    daysPaid: r.days_paid == null ? undefined : Number(r.days_paid),
   };
 }
 
@@ -116,7 +119,24 @@ export async function getStudents(): Promise<Student[]> {
 }
 
 export async function getPayments(): Promise<Payment[]> {
-  const rows = await query("select * from payments order by date desc, created_at desc");
+  // Pagos normales + pagos de rutas diarias (estos últimos solo lectura).
+  // Se combinan en la consulta para NO duplicar registros en la tabla payments.
+  const rows = await query(
+    `select id, client_name, date, concept, amount, method, status::text as status, period, observation,
+            student_id, client_id, advance, created_at,
+            null::uuid as route_id, null::int as days_paid, 'payment'::text as source
+       from payments
+     union all
+     select rp.id, dr.name as client_name, rp.payment_date as date,
+            'Ruta diaria — ' || rp.days_paid || ' día' || case when rp.days_paid = 1 then '' else 's' end as concept,
+            rp.amount, rp.method, 'completado'::text as status,
+            to_char(rp.payment_date, 'YYYY-MM') as period, rp.observation,
+            null::uuid, null::uuid, false, rp.created_at,
+            rp.route_id, rp.days_paid, 'route_payment'::text as source
+       from route_payments rp
+       join daily_routes dr on dr.id = rp.route_id
+     order by date desc, created_at desc`
+  );
   return rows.map(mapPayment);
 }
 
@@ -200,8 +220,8 @@ export async function getRouteExecutionsForDateRange(startDate: string, endDate:
 
 export async function getRouteSummary(routeId: string): Promise<{ totalCollected: number; totalPending: number; totalSkipped: number; executionCount: number } | null> {
   const rows = await query(
-    `select 
-      coalesce(sum(case when status = 'done' then amount_collected else 0 end), 0)::int as total_collected,
+    `select
+      coalesce((select sum(amount) from route_payments where route_id = $1), 0)::int as total_collected,
       count(*) filter (where status = 'pending')::int as total_pending,
       count(*) filter (where status = 'skipped')::int as total_skipped,
       count(*)::int as execution_count

@@ -9,7 +9,8 @@
     "lint": "eslint",
     "db:migrate:develop": "scripts/migrate.sh develop",
     "db:migrate:production": "scripts/migrate.sh production",
-    "db:seed": "scripts/migrate.sh seed"
+    "db:seed": "scripts/migrate.sh seed",
+    "db:seed:routes": "node --env-file=.env.local scripts/seed-routes.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",

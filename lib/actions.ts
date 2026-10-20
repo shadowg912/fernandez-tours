@@ -252,19 +252,14 @@ export async function deleteDailyRoute(id: string) {
 
 export async function toggleExecutionStatus(routeId: string, executionDate: string, newStatus: "pending" | "done" | "skipped") {
   const query = await getQuery();
-  const routeRows = await query("select daily_fee from daily_routes where id=$1", [routeId]);
-  if (routeRows.length === 0) throw new Error("Ruta no encontrada");
-  const dailyFee = routeRows[0].daily_fee;
-  
-  const amount = newStatus === "done" ? dailyFee : 0;
-  
   await query(
-    `update route_executions 
-     set status = $1, amount_collected = $2
-     where route_id = $3 and execution_date = $4`,
-    [newStatus, amount, routeId, executionDate]
+    `update route_executions
+     set status = $1
+     where route_id = $2 and execution_date = $3`,
+    [newStatus, routeId, executionDate]
   );
   revalidatePath("/rutas");
+  revalidatePath("/agenda");
 }
 
 export async function copyDailyRouteToNextMonth(routeId: string) {
@@ -285,7 +280,6 @@ export async function getRouteExecutions(routeId: string) {
     routeId: String(r.route_id),
     executionDate: String(r.execution_date).slice(0, 10),
     status: String(r.status),
-    amountCollected: Number(r.amount_collected),
   }));
 }
 
@@ -305,10 +299,10 @@ export async function getDailyRouteWithSummary(routeId: string) {
     routeId: String(r.route_id),
     executionDate: String(r.execution_date).slice(0, 10),
     status: String(r.status),
-    amountCollected: Number(r.amount_collected),
   }));
   
-  const totalCollected = executions.filter((e: Record<string, unknown>) => e.status === "done").reduce((s: number, e: Record<string, unknown>) => s + Number(e.amount_collected), 0);
+  const collectedRows = await query("select coalesce(sum(amount),0)::int as total from route_payments where route_id = $1", [routeId]);
+  const totalCollected = Number(collectedRows[0]?.total ?? 0);
   const totalPending = executions.filter((e: Record<string, unknown>) => e.status === "pending").length;
   const totalSkipped = executions.filter((e: Record<string, unknown>) => e.status === "skipped").length;
   
@@ -318,8 +312,6 @@ export async function getDailyRouteWithSummary(routeId: string) {
       name: String(route.name),
       dailyFee: Number(route.daily_fee),
       daysOfWeek: (route.days_of_week as string[]) ?? [],
-      startDate: String(route.start_date).slice(0, 10),
-      endDate: String(route.end_date).slice(0, 10),
     },
     executions,
     totalCollected,

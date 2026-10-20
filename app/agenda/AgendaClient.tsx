@@ -128,7 +128,7 @@ export default function AgendaClient({
             time: "",
             title: route?.name ?? "Ruta",
             subtitle: `Tarifa: ${formatMoney(route?.dailyFee ?? 0)}`,
-            amount: e.status === "done" ? e.amountCollected : 0,
+            amount: 0,
             status: e.status,
             data: e,
           });
@@ -362,9 +362,6 @@ export default function AgendaClient({
                   {statusLabels[selectedRoute.status]}
                 </span>
               </p>
-              {selectedRoute.status === "done" && (
-                <p><span className="font-semibold">Cobrado:</span> <span className="text-gold-deep font-bold">{formatMoney(selectedRoute.amountCollected)}</span></p>
-              )}
             </div>
             
             {selectedRoute.status === "pending" && (

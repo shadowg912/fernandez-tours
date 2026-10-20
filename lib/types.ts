@@ -66,6 +66,10 @@ export interface Payment {
   studentId?: string;   // vínculo a students (opcional)
   clientId?: string;    // vínculo a clients (opcional)
   advance: boolean;     // pago por adelantado
+  /** Origen del registro: pago normal o pago de ruta diaria (solo lectura). */
+  source?: "payment" | "route_payment";
+  routeId?: string;     // vínculo a daily_routes (pago de ruta)
+  daysPaid?: number;    // días pagados (pago de ruta)
 }
 
 export type ExecutionStatus = "pending" | "done" | "skipped";
@@ -83,7 +87,6 @@ export interface RouteExecution {
   routeId: string;
   executionDate: string;
   status: ExecutionStatus;
-  amountCollected: number;
 }
 
 export type DailyRouteDraft = Omit<DailyRoute, "id">;
@@ -93,6 +96,37 @@ export interface DailyRouteWithExecutions extends DailyRoute {
   totalCollected: number;
   totalPending: number;
   totalSkipped: number;
+}
+
+/** Un pago de ruta diaria: N días pagados a la tarifa vigente. */
+export interface RoutePayment {
+  id: string;
+  routeId: string;
+  daysPaid: number;
+  feePerDay: number;
+  amount: number;
+  paymentDate: string; // YYYY-MM-DD
+  method: PaymentMethod;
+  observation?: string;
+}
+
+export interface RoutePaymentDraft {
+  routeId: string;
+  daysPaid: number;
+  paymentDate: string;
+  method: PaymentMethod;
+  observation?: string;
+}
+
+/**
+ * Reporte de días de una ruta diaria.
+ * pendingDays puede ser negativo cuando hay saldo a favor (pagaron de más).
+ */
+export interface DailyRouteStats {
+  serviceDays: number;   // días hechos (hasta hoy)
+  paidDays: number;      // días pagados
+  pendingDays: number;   // serviceDays - paidDays
+  totalCollected: number;
 }
 
 export type StudentDraft = Omit<Student, "id" | "paid" | "paidUntil">;
