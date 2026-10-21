@@ -10,6 +10,7 @@ import { SummaryCard, ServiceCard } from "@/components/cards";
 import { Avatar, Button, Card, EmptyState, Modal, StatusBadge, Toast } from "@/components/ui";
 import { IconBell, IconCalendar, IconChevronRight, IconCheck, IconUsers } from "@/components/icons";
 import ThemeToggle from "@/components/ThemeToggle";
+import { ServiceCompletionDialog } from "@/components/service-completion";
 
 type DetailView = "today" | "completed" | "upcoming" | "students";
 
@@ -55,6 +56,7 @@ function ServiceRow({ service, onClick }: { service: Service; onClick?: () => vo
 
 export default function DashboardClient({ data }: { data: DashboardData }) {
   const [selected, setSelected] = useState<Service | null>(null);
+  const [completingService, setCompletingService] = useState<Service | null>(null);
   const [detail, setDetail] = useState<DetailView | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -65,11 +67,15 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
     return () => clearTimeout(t);
   }, [toast]);
 
-  const complete = (id: string) => {
+  const complete = (service: Service) => setCompletingService(service);
+
+  const confirmComplete = (pay: boolean) => {
+    if (!completingService) return;
     startTransition(async () => {
-      await completeService(id);
+      await completeService(completingService.id, pay);
+      setCompletingService(null);
       setSelected(null);
-      setToast("Servicio marcado como completado");
+      setToast(pay ? "Servicio completado y pago registrado" : "Servicio marcado como completado");
     });
   };
 
@@ -259,7 +265,7 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
       </Modal>
 
       {/* Detalle del servicio */}
-      <Modal open={selected !== null} onClose={() => setSelected(null)} title="Detalle del servicio">
+      <Modal open={selected !== null && completingService === null} onClose={() => setSelected(null)} title="Detalle del servicio">
         {selected && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -272,9 +278,13 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
               <p><span className="font-semibold">Ruta:</span> {selected.origin} → {selected.destination}</p>
               <p><span className="font-semibold">Pasajeros:</span> {selected.passengers}</p>
               <p><span className="font-semibold">Precio:</span> <span className="text-gold-deep font-bold">{formatMoney(selected.price)}</span></p>
+              <p><span className="font-semibold">Pagado:</span> <span className="text-green font-bold">{formatMoney(selected.paidAmount ?? 0)}</span></p>
+              {selected.status !== "cancelado" && (
+                <p><span className="font-semibold">Pendiente:</span> <span className={`font-bold ${selected.price - (selected.paidAmount ?? 0) > 0 ? "text-orange" : "text-green"}`}>{formatMoney(Math.max(0, selected.price - (selected.paidAmount ?? 0)))}</span></p>
+              )}
             </div>
             {selected.status !== "completado" && selected.status !== "cancelado" && (
-              <Button className="w-full" onClick={() => complete(selected.id)} disabled={pending}>
+              <Button className="w-full" onClick={() => complete(selected)} disabled={pending}>
                 <IconCheck className="h-5 w-5" /> {pending ? "Guardando…" : "Marcar como completado"}
               </Button>
             )}
@@ -284,6 +294,13 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
           </div>
         )}
       </Modal>
+
+      <ServiceCompletionDialog
+        service={completingService}
+        onClose={() => setCompletingService(null)}
+        onConfirm={confirmComplete}
+        loading={pending}
+      />
 
       <Toast message={toast} />
     </div>

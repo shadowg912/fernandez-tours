@@ -1,10 +1,10 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { Client, DailyRoute, DailyRouteDraft, PayFrequency, Payment, PaymentMethod, PaymentStatus, Route, RoutePaymentDraft, ServiceStatus, Student, StudentDraft } from "@/lib/types";
+import { Client, DailyRoute, DailyRouteDraft, PayFrequency, Payment, PaymentMethod, PaymentStatus, Route, RoutePaymentDraft, Service, ServiceStatus, Student, StudentDraft } from "@/lib/types";
 import { Button, ErrorBanner, Field, Input, Modal, SearchSelect, Select, Textarea } from "./ui";
 import { useMoneyInput } from "@/lib/hooks/useMoneyInput";
-import { formatMoney } from "@/lib/format";
+import { formatDateShort, formatMoney } from "@/lib/format";
 
 function FormActions({ onCancel, loading, label }: { onCancel: () => void; loading: boolean; label: string }) {
   return (
@@ -215,6 +215,7 @@ export interface PaymentFormResult {
   advance: boolean;
   studentId?: string;
   clientId?: string;
+  serviceId?: string;
 }
 
 export function PaymentForm({
@@ -226,6 +227,7 @@ export function PaymentForm({
   initial,
   students = [],
   clients = [],
+  services = [],
 }: {
   open: boolean;
   onClose: () => void;
@@ -235,6 +237,7 @@ export function PaymentForm({
   initial?: Payment;
   students?: Student[];
   clients?: Client[];
+  services?: Service[];
 }) {
   if (!open) return null;
   return (
@@ -246,6 +249,7 @@ export function PaymentForm({
       initial={initial}
       students={students}
       clients={clients}
+      services={services}
     />
   );
 }
@@ -258,6 +262,7 @@ function PaymentFormBody({
   initial,
   students,
   clients,
+  services,
 }: {
   onClose: () => void;
   onSaved: (result: PaymentFormResult) => void | Promise<void>;
@@ -266,17 +271,63 @@ function PaymentFormBody({
   initial?: Payment;
   students: Student[];
   clients: Client[];
+  services: Service[];
 }) {
   const isStudentMode = !!studentName;
 
-  const [recipient, setRecipient] = useState<"estudiante" | "cliente" | "otro">(
-    initial?.studentId ? "estudiante" : initial?.clientId ? "cliente" : isStudentMode ? "estudiante" : "otro"
+  const [recipient, setRecipient] = useState<"servicio" | "estudiante" | "cliente" | "otro">(
+    initial?.serviceId
+      ? "servicio"
+      : initial?.studentId
+        ? "estudiante"
+        : initial?.clientId
+          ? "cliente"
+          : isStudentMode
+            ? "estudiante"
+            : "servicio"
   );
   const [studentId, setStudentId] = useState(initial?.studentId ?? "");
   const [clientId, setClientId] = useState(initial?.clientId ?? "");
+  const [serviceId, setServiceId] = useState(initial?.serviceId ?? "");
   const [advance, setAdvance] = useState(initial?.advance ?? false);
   const [status, setStatus] = useState<PaymentStatus>(initial?.status ?? "completado");
   const [error, setError] = useState<string | null>(null);
+
+  const selectedService = services.find((s) => s.id === serviceId);
+  const servicePaid = selectedService?.paidAmount ?? 0;
+  const servicePending = selectedService ? Math.max(0, selectedService.price - servicePaid) : 0;
+  const editingOwnService = Boolean(initial?.serviceId && initial.serviceId === serviceId);
+
+  const conceptDefault = selectedService
+    ? editingOwnService
+      ? initial?.concept ?? ""
+      : `Servicio: ${selectedService.origin} → ${selectedService.destination}`
+    : initial?.concept ?? "";
+
+  const amountDefault = selectedService
+    ? editingOwnService
+      ? String(initial?.amount ?? "")
+      : String(servicePending)
+    : initial
+      ? String(initial.amount)
+      : defaultAmount
+        ? String(defaultAmount)
+        : "";
+
+  const periodDefault = selectedService
+    ? editingOwnService
+      ? initial?.period ?? selectedService.date.slice(0, 7)
+      : selectedService.date.slice(0, 7)
+    : initial?.period ?? new Date().toISOString().slice(0, 7);
+
+  const handleServiceChange = (id: string) => {
+    setServiceId(id);
+    const svc = services.find((s) => s.id === id);
+    if (id && svc && initial?.serviceId !== id) {
+      setAdvance(svc.status !== "completado");
+    }
+    if (!id) setAdvance(initial?.advance ?? false);
+  };
 
   const { submit, loading } = useSubmit(async () => {
     const form = document.getElementById("payment-form") as HTMLFormElement;
@@ -285,9 +336,15 @@ function PaymentFormBody({
     let resolvedName = "";
     let resolvedStudentId: string | undefined;
     let resolvedClientId: string | undefined;
+    let resolvedServiceId: string | undefined;
 
     if (isStudentMode) {
       resolvedName = studentName ?? "";
+    } else if (recipient === "servicio") {
+      const svc = services.find((s) => s.id === serviceId);
+      if (!svc) return setError("Selecciona un servicio.");
+      resolvedName = svc.clientName;
+      resolvedServiceId = svc.id;
     } else if (recipient === "estudiante") {
       const st = students.find((s) => s.id === studentId);
       if (!st) return setError("Selecciona un estudiante.");
@@ -305,7 +362,11 @@ function PaymentFormBody({
 
     const concept =
       String(fd.get("concept") ?? "").trim() ||
-      (recipient === "estudiante" || isStudentMode ? "Transporte estudiantil" : "Pago");
+      (recipient === "servicio" && selectedService
+        ? `Servicio: ${selectedService.origin} → ${selectedService.destination}`
+        : recipient === "estudiante" || isStudentMode
+          ? "Transporte estudiantil"
+          : "Pago");
     const period = String(fd.get("period") ?? "").trim();
     const observation = String(fd.get("observation") ?? "").trim();
 
@@ -320,6 +381,7 @@ function PaymentFormBody({
       advance,
       studentId: resolvedStudentId,
       clientId: resolvedClientId,
+      serviceId: resolvedServiceId,
       ...(period ? { period } : {}),
       ...(observation ? { observation } : {}),
     });
@@ -327,6 +389,22 @@ function PaymentFormBody({
 
   const studentOptions = students.map((s) => ({ value: s.id, label: s.school ? `${s.name} · ${s.school}` : s.name }));
   const clientOptions = clients.map((c) => ({ value: c.id, label: c.name }));
+  const serviceOptions = [...services]
+    .filter((s) => s.status !== "cancelado" || s.id === initial?.serviceId)
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .map((s) => ({
+      value: s.id,
+      label: `${formatDateShort(s.date)} · ${s.clientName} · ${s.origin} → ${s.destination}`,
+    }));
+
+  const recipientOptions: { value: typeof recipient; label: string }[] = [
+    { value: "servicio", label: "Servicio" },
+    { value: "estudiante", label: "Estudiante" },
+    { value: "otro", label: "Otro" },
+  ];
+  if (initial?.clientId || recipient === "cliente") {
+    recipientOptions.push({ value: "cliente", label: "Cliente" });
+  }
 
   return (
     <Modal open onClose={onClose} title={initial ? "Editar pago" : "Registrar pago"}>
@@ -338,24 +416,59 @@ function PaymentFormBody({
         ) : (
           <>
             <Field label="Destinatario">
-              <div className="grid grid-cols-3 gap-2">
-                {(["estudiante", "cliente", "otro"] as const).map((r) => (
+              <div className="flex flex-wrap gap-2">
+                {recipientOptions.map((r) => (
                   <button
-                    key={r}
+                    key={r.value}
                     type="button"
-                    onClick={() => setRecipient(r)}
-                    className={`rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
-                      recipient === r
+                    onClick={() => setRecipient(r.value)}
+                    className={`min-w-[88px] flex-1 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+                      recipient === r.value
                         ? "bg-teal text-white shadow-sm"
                         : "bg-white text-dark/70 border border-dark/10 hover:border-teal"
                     }`}
                   >
-                    {r === "estudiante" ? "Estudiante" : r === "cliente" ? "Cliente" : "Otro"}
+                    {r.label}
                   </button>
                 ))}
               </div>
             </Field>
 
+            {recipient === "servicio" && (
+              <>
+                <Field label="Servicio">
+                  <SearchSelect
+                    options={serviceOptions}
+                    value={serviceId}
+                    onChange={handleServiceChange}
+                    placeholder={services.length ? "Buscar servicio…" : "No hay servicios registrados"}
+                    disabled={services.length === 0}
+                  />
+                </Field>
+
+                {selectedService && (
+                  <div className="rounded-xl border border-teal/20 bg-teal/5 p-3 text-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-dark/60">Precio</span>
+                      <span className="font-semibold">{formatMoney(selectedService.price)}</span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between gap-3">
+                      <span className="text-dark/60">Pagado</span>
+                      <span className="font-semibold text-green">{formatMoney(servicePaid)}</span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between gap-3">
+                      <span className="text-dark/60">Pendiente</span>
+                      <span className={`font-bold ${servicePending > 0 ? "text-orange" : "text-green"}`}>
+                        {formatMoney(servicePending)}
+                      </span>
+                    </div>
+                    {servicePending <= 0 && !editingOwnService && (
+                      <p className="mt-2 text-xs text-green">Este servicio ya está pagado.</p>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
             {recipient === "estudiante" && (
               <Field label="Estudiante">
                 <SearchSelect options={studentOptions} value={studentId} onChange={setStudentId} placeholder="Buscar estudiante…" />
@@ -370,7 +483,7 @@ function PaymentFormBody({
               <Field label="Nombre">
                 <Input
                   name="otherName"
-                  defaultValue={initial && !initial.studentId && !initial.clientId ? initial.clientName : ""}
+                  defaultValue={initial && !initial.studentId && !initial.clientId && !initial.serviceId ? initial.clientName : ""}
                   placeholder="Nombre de la persona"
                 />
               </Field>
@@ -380,24 +493,26 @@ function PaymentFormBody({
 
         <Field label="Concepto">
           <Input
+            key={`concept-${serviceId}`}
             name="concept"
-            defaultValue={initial?.concept ?? ""}
+            defaultValue={conceptDefault}
             placeholder="Ej. Mensualidad de octubre / Servicio Santiago → La Vega"
           />
         </Field>
 
         <div className="grid grid-cols-2 gap-3">
           <Field label="Periodo">
-            <Input name="period" type="month" defaultValue={initial?.period ?? new Date().toISOString().slice(0, 7)} />
+            <Input key={`period-${serviceId}`} name="period" type="month" defaultValue={periodDefault} />
           </Field>
           <Field label="Monto (RD$)">
             <Input
+              key={`amount-${serviceId}`}
               name="amount"
               type="number"
               min={0}
               placeholder="0"
               required
-              defaultValue={initial ? String(initial.amount) : defaultAmount ? String(defaultAmount) : ""}
+              defaultValue={amountDefault}
             />
           </Field>
         </div>

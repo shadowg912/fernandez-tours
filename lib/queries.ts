@@ -19,6 +19,7 @@ function mapService(r: Row): Service {
     passengers: Number(r.passengers),
     price: Number(r.price),
     status: String(r.status) as ServiceStatus,
+    paidAmount: Number(r.paid_amount ?? 0),
   };
 }
 
@@ -96,6 +97,7 @@ function mapPayment(r: Row): Payment {
     observation: r.observation == null ? undefined : String(r.observation),
     studentId: r.student_id == null ? undefined : String(r.student_id),
     clientId: r.client_id == null ? undefined : String(r.client_id),
+    serviceId: r.service_id == null ? undefined : String(r.service_id),
     advance: Boolean(r.advance),
     source,
     routeId: r.route_id == null ? undefined : String(r.route_id),
@@ -104,8 +106,14 @@ function mapPayment(r: Row): Payment {
   };
 }
 
+const SERVICE_WITH_PAID = `select s.*, coalesce((
+    select sum(p.amount) from payments p
+    where p.service_id = s.id and p.status = 'completado'
+  ), 0)::int as paid_amount
+  from services s`;
+
 export async function getServices(): Promise<Service[]> {
-  const rows = await query("select * from services order by date, time");
+  const rows = await query(`${SERVICE_WITH_PAID} order by s.date, s.time`);
   return rows.map(mapService);
 }
 
@@ -124,7 +132,7 @@ export async function getPayments(): Promise<Payment[]> {
   // Se combinan en la consulta para NO duplicar registros en la tabla payments.
   const rows = await query(
     `select id, client_name, date, concept, amount, method, status::text as status, period, observation,
-            student_id, client_id, advance, created_at,
+            student_id, client_id, service_id, advance, created_at,
             null::uuid as route_id, null::int as days_paid, null::int as fee_per_day, 'payment'::text as source
        from payments
      union all
@@ -132,7 +140,7 @@ export async function getPayments(): Promise<Payment[]> {
             'Ruta diaria — ' || rp.days_paid || ' día' || case when rp.days_paid = 1 then '' else 's' end as concept,
             rp.amount, rp.method, 'completado'::text as status,
             to_char(rp.payment_date, 'YYYY-MM') as period, rp.observation,
-            null::uuid, null::uuid, false, rp.created_at,
+            null::uuid, null::uuid, null::uuid, false, rp.created_at,
             rp.route_id, rp.days_paid, rp.fee_per_day, 'route_payment'::text as source
        from route_payments rp
        join daily_routes dr on dr.id = rp.route_id
@@ -159,27 +167,27 @@ export async function getDashboardData(): Promise<DashboardData> {
   const today = todayRows.t;
 
   const [todayServices, completedWeek, completedMonth, upcomingMonth, pendingStudents] = await Promise.all([
-    query("select * from services where date = $1 order by time", [today]).then((r) => r.map(mapService)),
+    query(`${SERVICE_WITH_PAID} where s.date = $1 order by s.time`, [today]).then((r) => r.map(mapService)),
     query(
-      `select * from services
-       where status = 'completado'
-         and date >= date_trunc('week', current_date)::date
-         and date < (date_trunc('week', current_date) + interval '7 days')::date
-       order by date, time`
+      `${SERVICE_WITH_PAID}
+       where s.status = 'completado'
+         and s.date >= date_trunc('week', current_date)::date
+         and s.date < (date_trunc('week', current_date) + interval '7 days')::date
+       order by s.date, s.time`
     ).then((r) => r.map(mapService)),
     query(
-      `select * from services
-       where status = 'completado'
-         and date >= date_trunc('month', current_date)::date
-         and date < (date_trunc('month', current_date) + interval '1 month')::date
-       order by date, time`
+      `${SERVICE_WITH_PAID}
+       where s.status = 'completado'
+         and s.date >= date_trunc('month', current_date)::date
+         and s.date < (date_trunc('month', current_date) + interval '1 month')::date
+       order by s.date, s.time`
     ).then((r) => r.map(mapService)),
     query(
-      `select * from services
-       where status = 'confirmado'
-         and date >= current_date
-         and date < (date_trunc('month', current_date) + interval '1 month')::date
-       order by date, time`
+      `${SERVICE_WITH_PAID}
+       where s.status = 'confirmado'
+         and s.date >= current_date
+         and s.date < (date_trunc('month', current_date) + interval '1 month')::date
+       order by s.date, s.time`
     ).then((r) => r.map(mapService)),
     query("select * from students where paid = false order by name").then((r) => r.map(mapStudent)),
   ]);

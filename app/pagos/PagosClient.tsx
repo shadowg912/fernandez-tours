@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Client, Payment, PaymentDraft, Student } from "@/lib/types";
+import { Client, Payment, PaymentDraft, Service, Student } from "@/lib/types";
 import { createPayment, deletePayment, markPaymentPaid, updatePayment } from "@/lib/actions";
 import { formatMoney } from "@/lib/format";
 import { PaymentCard, SummaryCard } from "@/components/cards";
 import { Button, Toast } from "@/components/ui";
 import { ConfirmDialog, PaymentForm, PaymentFormResult } from "@/components/forms";
-import { RoutePaymentReceipt, RouteReceiptData } from "@/components/receipts";
+import { RoutePaymentReceipt, RouteReceiptData, ServicePaymentReceipt, ServiceReceiptData } from "@/components/receipts";
 import { IconPlus, IconSearch } from "@/components/icons";
 
 type StatusFilter = "todos" | "completado" | "pendiente";
@@ -25,6 +25,7 @@ function draftFromResult(p: PaymentFormResult): PaymentDraft {
     ...(p.observation ? { observation: p.observation } : {}),
     ...(p.studentId ? { studentId: p.studentId } : {}),
     ...(p.clientId ? { clientId: p.clientId } : {}),
+    ...(p.serviceId ? { serviceId: p.serviceId } : {}),
   };
 }
 
@@ -32,15 +33,18 @@ export default function PagosClient({
   payments,
   students,
   clients,
+  services,
 }: {
   payments: Payment[];
   students: Student[];
   clients: Client[];
+  services: Service[];
 }) {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Payment | null>(null);
   const [deleting, setDeleting] = useState<Payment | null>(null);
   const [receipt, setReceipt] = useState<RouteReceiptData | null>(null);
+  const [serviceReceipt, setServiceReceipt] = useState<ServiceReceiptData | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -105,6 +109,35 @@ export default function PagosClient({
   };
 
   const onMarkPaid = (p: Payment) => run(async () => { await markPaymentPaid(p.id); }, "Pago marcado como completado");
+
+  const openServiceReceipt = (serviceId: string) => {
+    const service = services.find((s) => s.id === serviceId);
+    if (!service) return;
+    const linkedPayments = payments
+      .filter((p) => p.serviceId === serviceId)
+      .reverse();
+    if (!linkedPayments.some((p) => p.status === "completado")) return;
+
+    setServiceReceipt({
+      serviceId: service.id,
+      clientName: service.clientName,
+      serviceDate: service.date,
+      time: service.time,
+      origin: service.origin,
+      destination: service.destination,
+      passengers: service.passengers,
+      price: service.price,
+      payments: linkedPayments.map((p) => ({
+        id: p.id,
+        date: p.date,
+        concept: p.concept,
+        amount: p.amount,
+        method: p.method,
+        status: p.status,
+        advance: p.advance,
+      })),
+    });
+  };
 
   return (
     <div className="space-y-5">
@@ -208,6 +241,10 @@ export default function PagosClient({
           {list.map((p) => {
             // Los pagos de ruta son solo lectura: se editan desde /rutas.
             const isRoutePayment = p.source === "route_payment" || Boolean(p.routeId);
+            const serviceId = p.serviceId;
+            const canViewServiceReceipt = serviceId
+              ? payments.some((x) => x.serviceId === serviceId && x.status === "completado")
+              : false;
             return (
               <PaymentCard
                 key={`${p.source ?? "payment"}-${p.id}`}
@@ -215,16 +252,22 @@ export default function PagosClient({
                 onEdit={isRoutePayment ? undefined : () => { setEditing(p); setFormOpen(true); }}
                 onDelete={isRoutePayment ? undefined : () => setDeleting(p)}
                 onMarkPaid={isRoutePayment ? undefined : () => onMarkPaid(p)}
-                onViewReceipt={isRoutePayment ? () => setReceipt({
-                  id: p.id,
-                  routeName: p.clientName,
-                  daysPaid: p.daysPaid ?? 0,
-                  feePerDay: p.feePerDay ?? (p.daysPaid ? Math.round(p.amount / p.daysPaid) : 0),
-                  amount: p.amount,
-                  paymentDate: p.date,
-                  method: p.method,
-                  ...(p.observation ? { observation: p.observation } : {}),
-                }) : undefined}
+                onViewReceipt={
+                  isRoutePayment
+                    ? () => setReceipt({
+                        id: p.id,
+                        routeName: p.clientName,
+                        daysPaid: p.daysPaid ?? 0,
+                        feePerDay: p.feePerDay ?? (p.daysPaid ? Math.round(p.amount / p.daysPaid) : 0),
+                        amount: p.amount,
+                        paymentDate: p.date,
+                        method: p.method,
+                        ...(p.observation ? { observation: p.observation } : {}),
+                      })
+                    : serviceId && canViewServiceReceipt
+                      ? () => openServiceReceipt(serviceId)
+                      : undefined
+                }
               />
             );
           })}
@@ -238,6 +281,7 @@ export default function PagosClient({
         initial={editing ?? undefined}
         students={students}
         clients={clients}
+        services={services}
       />
 
       <ConfirmDialog
@@ -250,6 +294,7 @@ export default function PagosClient({
       />
 
       <RoutePaymentReceipt data={receipt} onClose={() => setReceipt(null)} />
+      <ServicePaymentReceipt data={serviceReceipt} onClose={() => setServiceReceipt(null)} />
 
       <Toast message={toast} />
     </div>

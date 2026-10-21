@@ -92,12 +92,63 @@ export async function createService(d: ServiceDraft) {
   revalidatePath("/agenda");
 }
 
-export async function completeService(id: string) {
+export async function completeService(id: string, completePayment = false) {
   const query = await getQuery();
+  const services = await query<{
+    client_name: string;
+    date: Date | string;
+    origin: string;
+    destination: string;
+    price: number;
+  }>("select client_name, date, origin, destination, price from services where id=$1", [id]);
+
+  const service = services[0];
+  if (!service) throw new Error("Servicio no encontrado");
+
+  if (completePayment) {
+    // Al confirmar que el pago se completó, los pagos pendientes del servicio
+    // pasan a completados para no duplicar la deuda.
+    await query(
+      "update payments set status='completado' where service_id=$1 and status='pendiente'",
+      [id]
+    );
+
+    const paidRows = await query<{ paid: number }>(
+      "select coalesce(sum(amount), 0)::int as paid from payments where service_id=$1 and status='completado'",
+      [id]
+    );
+    const paid = Number(paidRows[0]?.paid ?? 0);
+    const remaining = Math.max(0, Number(service.price) - paid);
+
+    if (remaining > 0) {
+      const methodRows = await query<{ method: string }>(
+        "select method from payments where service_id=$1 order by created_at desc limit 1",
+        [id]
+      );
+      const method = methodRows[0]?.method ?? "efectivo";
+      const date = service.date instanceof Date ? service.date : new Date(`${service.date}T12:00:00`);
+      const period = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+
+      await query(
+        `insert into payments (client_name, date, concept, amount, method, status, period, service_id, advance)
+         values ($1, current_date, $2, $3, $4, 'completado', $5, $6, false)`,
+        [
+          service.client_name,
+          `Pago final · Servicio: ${service.origin} → ${service.destination}`,
+          remaining,
+          method,
+          period,
+          id,
+        ]
+      );
+    }
+  }
+
   await query("update services set status='completado' where id=$1", [id]);
   revalidatePath("/");
   revalidatePath("/servicios");
   revalidatePath("/agenda");
+  revalidatePath("/pagos");
 }
 
 export async function cancelService(id: string) {
@@ -129,14 +180,16 @@ export async function createClient(d: ClientDraft) {
 export async function createPayment(d: PaymentDraft) {
   const query = await getQuery();
   await query(
-    `insert into payments (client_name, date, concept, amount, method, status, period, observation, student_id, client_id, advance)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-    [d.clientName, d.date, d.concept, d.amount, d.method, d.status, d.period ?? null, d.observation ?? null, d.studentId ?? null, d.clientId ?? null, d.advance ?? false]
+    `insert into payments (client_name, date, concept, amount, method, status, period, observation, student_id, client_id, service_id, advance)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+    [d.clientName, d.date, d.concept, d.amount, d.method, d.status, d.period ?? null, d.observation ?? null, d.studentId ?? null, d.clientId ?? null, d.serviceId ?? null, d.advance ?? false]
   );
   if (d.studentId) await query("select refresh_student_paid_until($1)", [d.studentId]);
   revalidatePath("/pagos");
   revalidatePath("/");
   revalidatePath("/transporte");
+  revalidatePath("/clientes");
+  revalidatePath("/servicios");
 }
 
 export async function updatePayment(id: string, d: PaymentDraft) {
@@ -146,9 +199,9 @@ export async function updatePayment(id: string, d: PaymentDraft) {
   await query(
     `update payments
      set client_name=$1, date=$2, concept=$3, amount=$4, method=$5, status=$6, period=$7, observation=$8,
-         student_id=$9, client_id=$10, advance=$11
-     where id=$12`,
-    [d.clientName, d.date, d.concept, d.amount, d.method, d.status, d.period ?? null, d.observation ?? null, d.studentId ?? null, d.clientId ?? null, d.advance ?? false, id]
+         student_id=$9, client_id=$10, service_id=$11, advance=$12
+     where id=$13`,
+    [d.clientName, d.date, d.concept, d.amount, d.method, d.status, d.period ?? null, d.observation ?? null, d.studentId ?? null, d.clientId ?? null, d.serviceId ?? null, d.advance ?? false, id]
   );
   const affected = new Set<string>();
   if (prevStudent) affected.add(prevStudent);
@@ -157,6 +210,8 @@ export async function updatePayment(id: string, d: PaymentDraft) {
   revalidatePath("/pagos");
   revalidatePath("/");
   revalidatePath("/transporte");
+  revalidatePath("/clientes");
+  revalidatePath("/servicios");
 }
 
 export async function deletePayment(id: string) {
