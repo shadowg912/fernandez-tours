@@ -100,6 +100,7 @@ function mapPayment(r: Row): Payment {
     source,
     routeId: r.route_id == null ? undefined : String(r.route_id),
     daysPaid: r.days_paid == null ? undefined : Number(r.days_paid),
+    feePerDay: r.fee_per_day == null ? undefined : Number(r.fee_per_day),
   };
 }
 
@@ -124,7 +125,7 @@ export async function getPayments(): Promise<Payment[]> {
   const rows = await query(
     `select id, client_name, date, concept, amount, method, status::text as status, period, observation,
             student_id, client_id, advance, created_at,
-            null::uuid as route_id, null::int as days_paid, 'payment'::text as source
+            null::uuid as route_id, null::int as days_paid, null::int as fee_per_day, 'payment'::text as source
        from payments
      union all
      select rp.id, dr.name as client_name, rp.payment_date as date,
@@ -132,7 +133,7 @@ export async function getPayments(): Promise<Payment[]> {
             rp.amount, rp.method, 'completado'::text as status,
             to_char(rp.payment_date, 'YYYY-MM') as period, rp.observation,
             null::uuid, null::uuid, false, rp.created_at,
-            rp.route_id, rp.days_paid, 'route_payment'::text as source
+            rp.route_id, rp.days_paid, rp.fee_per_day, 'route_payment'::text as source
        from route_payments rp
        join daily_routes dr on dr.id = rp.route_id
      order by date desc, created_at desc`

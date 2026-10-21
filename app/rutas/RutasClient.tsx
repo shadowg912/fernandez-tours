@@ -6,6 +6,7 @@ import { formatDateShort, formatMoney } from "@/lib/format";
 import { DailyRouteCard, SummaryCard } from "@/components/cards";
 import { Button, EmptyState, Modal, Toast } from "@/components/ui";
 import { DailyRouteForm, ConfirmDialog, RoutePaymentForm } from "@/components/forms";
+import { RoutePaymentReceipt, RouteReceiptData } from "@/components/receipts";
 import { IconPlus, IconCopy, IconSearch } from "@/components/icons";
 import { 
   createDailyRoute, 
@@ -53,6 +54,7 @@ export default function RutasClient({
   const [routeStats, setRouteStats] = useState<Record<string, DailyRouteStats>>({});
   const [routePayments, setRoutePayments] = useState<RoutePayment[]>([]);
   const [pendingDays, setPendingDays] = useState<string[]>([]);
+  const [receipt, setReceipt] = useState<RouteReceiptData | null>(null);
   const [showAll, setShowAll] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -405,7 +407,22 @@ export default function RutasClient({
                             {p.observation ? ` · ${p.observation}` : ""}
                           </p>
                         </div>
-                        <span className="shrink-0 font-bold text-dark-teal">{formatMoney(p.amount)}</span>
+                        <button
+                          type="button"
+                          onClick={() => setReceipt({
+                            id: p.id,
+                            routeName: selectedRoute.name,
+                            daysPaid: p.daysPaid,
+                            feePerDay: p.feePerDay,
+                            amount: p.amount,
+                            paymentDate: p.paymentDate,
+                            method: p.method,
+                            ...(p.observation ? { observation: p.observation } : {}),
+                          })}
+                          className="shrink-0 rounded-lg border border-dark/15 bg-white px-3 py-2 text-xs font-semibold text-dark transition-colors hover:border-teal hover:text-dark-teal"
+                        >
+                          Ver recibo
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -539,6 +556,8 @@ export default function RutasClient({
         title="Eliminar ruta"
         message={`¿Eliminar la ruta "${deletingRoute?.name}"? Se borrarán todas sus ejecuciones.`}
       />
+
+      <RoutePaymentReceipt data={receipt} onClose={() => setReceipt(null)} />
 
       <Toast message={toast} />
     </div>

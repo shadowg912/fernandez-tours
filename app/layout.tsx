@@ -5,7 +5,13 @@ import NavShell from "@/components/NavShell";
 export const metadata: Metadata = {
   title: "Fernández Tours",
   description: "Sistema de gestión de transporte y tours",
-  icons: { icon: "/logo.svg" },
+  icons: {
+    icon: [
+      { url: "/favicon48x48.ico", type: "image/x-icon", sizes: "48x48 32x32" },
+      { url: "/favicon96x96.png", type: "image/png", sizes: "96x96" },
+    ],
+    apple: [{ url: "/favicon180x180.png", sizes: "180x180", type: "image/png" }],
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
