@@ -70,6 +70,7 @@ export interface Payment {
   source?: "payment" | "route_payment";
   routeId?: string;     // vínculo a daily_routes (pago de ruta)
   daysPaid?: number;    // días pagados (pago de ruta)
+  feePerDay?: number;   // tarifa por día al momento del pago (pago de ruta)
 }
 
 export type ExecutionStatus = "pending" | "done" | "skipped";

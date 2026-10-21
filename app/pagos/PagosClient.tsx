@@ -7,6 +7,7 @@ import { formatMoney } from "@/lib/format";
 import { PaymentCard, SummaryCard } from "@/components/cards";
 import { Button, Toast } from "@/components/ui";
 import { ConfirmDialog, PaymentForm, PaymentFormResult } from "@/components/forms";
+import { RoutePaymentReceipt, RouteReceiptData } from "@/components/receipts";
 import { IconPlus, IconSearch } from "@/components/icons";
 
 type StatusFilter = "todos" | "completado" | "pendiente";
@@ -39,6 +40,7 @@ export default function PagosClient({
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Payment | null>(null);
   const [deleting, setDeleting] = useState<Payment | null>(null);
+  const [receipt, setReceipt] = useState<RouteReceiptData | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -213,6 +215,16 @@ export default function PagosClient({
                 onEdit={isRoutePayment ? undefined : () => { setEditing(p); setFormOpen(true); }}
                 onDelete={isRoutePayment ? undefined : () => setDeleting(p)}
                 onMarkPaid={isRoutePayment ? undefined : () => onMarkPaid(p)}
+                onViewReceipt={isRoutePayment ? () => setReceipt({
+                  id: p.id,
+                  routeName: p.clientName,
+                  daysPaid: p.daysPaid ?? 0,
+                  feePerDay: p.feePerDay ?? (p.daysPaid ? Math.round(p.amount / p.daysPaid) : 0),
+                  amount: p.amount,
+                  paymentDate: p.date,
+                  method: p.method,
+                  ...(p.observation ? { observation: p.observation } : {}),
+                }) : undefined}
               />
             );
           })}
@@ -236,6 +248,8 @@ export default function PagosClient({
         title="Eliminar pago"
         message={`¿Eliminar el pago de ${deleting?.clientName ?? ""}? Esta acción no se puede deshacer.`}
       />
+
+      <RoutePaymentReceipt data={receipt} onClose={() => setReceipt(null)} />
 
       <Toast message={toast} />
     </div>
