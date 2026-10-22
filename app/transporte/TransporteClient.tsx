@@ -7,7 +7,9 @@ import { createRoute, updateRoute, createStudent, deleteStudent, markStudentPaid
 import { StudentCard, SummaryCard } from "@/components/cards";
 import { Avatar, Button, Chip, EmptyState, Modal, Toast } from "@/components/ui";
 import { ConfirmDialog, PaymentForm, RouteForm, StudentForm } from "@/components/forms";
-import { IconCheck, IconPhone, IconPlus, IconRoute } from "@/components/icons";
+import { StudentPaymentReceipt, StudentReceiptData } from "@/components/receipts";
+import { StudentReceiptDialog } from "@/components/student-receipt-dialog";
+import { IconCheck, IconDots, IconFileText, IconPhone, IconPlus, IconRoute } from "@/components/icons";
 
 type Filter = "todos" | "pagado" | "pendiente" | "mensual" | "quincenal" | "semanal";
 
@@ -29,11 +31,11 @@ function formatTime12h(time24: string): string {
   return `${hour}:${String(m).padStart(2, "0")} ${period}`;
 }
 
-export default function TransporteClient({ 
-  students: initialStudents, 
-  routes: initialRoutes 
-}: { 
-  students: Student[]; 
+export default function TransporteClient({
+  students: initialStudents,
+  routes: initialRoutes
+}: {
+  students: Student[];
   routes: Route[];
 }) {
   const [filter, setFilter] = useState<Filter>("pendiente");
@@ -45,6 +47,9 @@ export default function TransporteClient({
   const [editing, setEditing] = useState<Student | null>(null);
   const [deleting, setDeleting] = useState<Student | null>(null);
   const [payStudent, setPayStudent] = useState<Student | null>(null);
+  const [receiptOpen, setReceiptOpen] = useState(false);
+  const [studentReceipt, setStudentReceipt] = useState<StudentReceiptData | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -61,17 +66,28 @@ export default function TransporteClient({
     return () => clearTimeout(t);
   }, [toast]);
 
-  const pendingStudents = students.filter((s) => !s.paid);
-  const total = students.reduce((sum, s) => sum + s.monthlyFee, 0);
-  const collected = students.filter((s) => s.paid).reduce((sum, s) => sum + s.monthlyFee, 0);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: KeyboardEvent) => e.key === "Escape" && setMenuOpen(false);
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [menuOpen]);
+
+  const scopedStudents =
+    selectedRouteId === "all"
+      ? students
+      : selectedRouteId
+        ? students.filter((s) => s.routeId === selectedRouteId)
+        : [];
+  const pendingStudents = scopedStudents.filter((s) => !s.paid);
+  const total = scopedStudents.reduce((sum, s) => sum + s.monthlyFee, 0);
+  const collected = scopedStudents.filter((s) => s.paid).reduce((sum, s) => sum + s.monthlyFee, 0);
 
   // La sección "Pagos pendientes" sustituye a la lista principal en el filtro "Pendientes"
   const showPendingSection =
-    pendingStudents.length > 0 && filter === "pendiente" && selectedRouteId === "";
+    selectedRouteId !== "" && pendingStudents.length > 0 && filter === "pendiente";
 
-  const filtered = students.filter((s) => {
-    // Filtro por ruta
-    if (selectedRouteId && s.routeId !== selectedRouteId) return false;
+  const filtered = scopedStudents.filter((s) => {
     // Filtro por estado/frecuencia
     if (filter === "todos") return true;
     if (filter === "pagado") return s.paid;
@@ -81,6 +97,10 @@ export default function TransporteClient({
 
   const selected = students.find((s) => s.id === selectedId) ?? null;
   const selectedRoute = routes.find((r) => r.id === selectedRouteId) ?? null;
+  const scopeName =
+    selectedRouteId === "all"
+      ? "en todas las rutas"
+      : `en la ruta "${selectedRoute?.name ?? ""}"`;
 
   const run = (fn: () => Promise<void>, message: string) => {
     startTransition(async () => {
@@ -139,26 +159,86 @@ export default function TransporteClient({
           <h1 className="text-2xl font-bold">Transporte estudiantil</h1>
           <p className="text-sm text-dark/60">Gestionado en tiempo real</p>
         </div>
-        <div className="flex gap-2">
+        <div className="ml-auto hidden gap-2 sm:flex">
           <Button onClick={() => setRouteFormOpen(true)}>
-            <IconRoute className="h-5 w-5" /> <span className="hidden sm:inline">Nueva ruta</span><span className="sm:hidden">Ruta</span>
+            <IconRoute className="h-5 w-5" /> Nueva ruta
           </Button>
           <Button onClick={() => setFormOpen(true)}>
-            <IconPlus className="h-5 w-5" /> <span className="hidden sm:inline">Nuevo estudiante</span><span className="sm:hidden">Nuevo</span>
+            <IconPlus className="h-5 w-5" /> Nuevo estudiante
           </Button>
+          <Button onClick={() => setReceiptOpen(true)}>
+            <IconFileText className="h-5 w-5" /> Recibo de estudiante
+          </Button>
+        </div>
+
+        {/* Acciones en móvil */}
+        <div className="relative ml-auto sm:hidden">
+          <Button
+            onClick={() => setMenuOpen((open) => !open)}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+          >
+            <IconDots className="h-5 w-5" /> Acciones
+          </Button>
+
+          {menuOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+              <div
+                role="menu"
+                className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-xl border border-dark/10 bg-white py-1 shadow-xl"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setRouteFormOpen(true);
+                  }}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-medium text-dark transition-colors hover:bg-teal/10"
+                >
+                  <IconRoute className="h-5 w-5 text-dark/50" /> Nueva ruta
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setFormOpen(true);
+                  }}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-medium text-dark transition-colors hover:bg-teal/10"
+                >
+                  <IconPlus className="h-5 w-5 text-dark/50" /> Nuevo estudiante
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setReceiptOpen(true);
+                  }}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-medium text-dark transition-colors hover:bg-teal/10"
+                >
+                  <IconFileText className="h-5 w-5 text-dark/50" /> Recibo de estudiante
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
-      <section className="flex flex-wrap gap-3">
-        <SummaryCard value={String(students.length)} label="Estudiantes" />
-        <SummaryCard value={formatMoney(collected)} label="Cobrado" />
-        <SummaryCard value={formatMoney(total - collected)} label="Pendiente" accent />
-      </section>
+      {selectedRouteId && (
+        <section className="flex flex-wrap gap-3">
+          <SummaryCard value={String(scopedStudents.length)} label="Estudiantes" />
+          <SummaryCard value={formatMoney(collected)} label="Cobrado" />
+          <SummaryCard value={formatMoney(total - collected)} label="Pendiente" accent />
+        </section>
+      )}
 
       {/* Selector de ruta + Filtros */}
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-        {/* Dropdown de ruta - full width en móvil, auto en desktop */}
-        <div className="w-full sm:w-auto">
+        {/* Dropdown de ruta - full width en móvil, ancho fijo en desktop */}
+        <div className="w-full sm:w-64 sm:shrink-0">
           <label className="sr-only">Seleccionar ruta</label>
           <div className="relative">
             <select
@@ -172,7 +252,8 @@ export default function TransporteClient({
                 backgroundSize: '20px',
               }}
             >
-              <option value="">Todas las rutas</option>
+              <option value="" disabled>Selecciona una ruta</option>
+              <option value="all">Todas las rutas</option>
               {routes.map((r) => (
                 <option key={r.id} value={r.id}>{r.name}</option>
               ))}
@@ -187,8 +268,8 @@ export default function TransporteClient({
               key={f.value}
               onClick={() => setFilter(f.value)}
               className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-medium transition-all min-h-[44px] ${
-                filter === f.value 
-                  ? "bg-teal text-white shadow-sm" 
+                filter === f.value
+                  ? "bg-teal text-white shadow-sm"
                   : "bg-white text-dark/70 border border-dark/10 hover:border-teal hover:bg-teal/5"
               }`}
             >
@@ -198,66 +279,85 @@ export default function TransporteClient({
         </div>
       </div>
 
-      {showPendingSection && (
+      {!selectedRouteId ? (
         <section>
-          <h2 className="mb-3 text-lg font-bold">Pagos pendientes</h2>
-          <div className="space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0">
-            {pendingStudents.map((s) => (
-              <StudentCard 
-                key={s.id} 
-                student={s} 
-                onClick={() => setSelectedId(s.id)}
-                onQuickPay={() => onQuickPay(s)}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {!showPendingSection && (
-      <section>
-        <h2 className="mb-3 text-lg font-bold">
-          {selectedRouteId ? selectedRoute?.name : filter === "todos" ? "Todos los estudiantes" : filters.find((f) => f.value === filter)?.label}
-        </h2>
-        {filtered.length === 0 ? (
           <EmptyState
-            title="No hay estudiantes"
-            message={
-              selectedRouteId
-                ? `No hay estudiantes en la ruta "${selectedRoute?.name}".`
-                : filter === "todos"
-                ? "Agrega tu primer estudiante con el botón de arriba."
-                : "Ningún estudiante coincide con este filtro."
-            }
+            title="Selecciona una ruta"
+            message="Elige una ruta para ver sus estudiantes y el resumen de cobros."
           />
-        ) : (
-          <div className="space-y-3 md:grid md:grid-cols-2 xl:grid-cols-3 md:gap-3 md:space-y-0">
-            {filtered.map((s) => (
-              <StudentCard 
-                key={s.id} 
-                student={s} 
-                onClick={() => setSelectedId(s.id)}
-                onQuickPay={() => onQuickPay(s)}
-              />
-            ))}
-          </div>
-        )}
-      </section>
+        </section>
+      ) : (
+        <>
+          {showPendingSection && (
+            <section>
+              <h2 className="mb-3 text-lg font-bold">Pagos pendientes</h2>
+              <div className="space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0">
+                {pendingStudents.map((s) => (
+                  <StudentCard
+                    key={s.id}
+                    student={s}
+                    onClick={() => setSelectedId(s.id)}
+                    onQuickPay={() => onQuickPay(s)}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {!showPendingSection && (
+            <section>
+              <h2 className="mb-3 text-lg font-bold">
+                {selectedRouteId === "all"
+                  ? "Todos los estudiantes"
+                  : selectedRoute?.name ?? "Estudiantes"}
+              </h2>
+              {filtered.length === 0 ? (
+                <EmptyState
+                  title="No hay estudiantes"
+                  message={
+                    filter === "todos"
+                      ? selectedRouteId === "all"
+                        ? "Agrega tu primer estudiante con el botón de arriba."
+                        : `No hay estudiantes ${scopeName}.`
+                      : filter === "pendiente"
+                        ? `No hay estudiantes pendientes ${scopeName}.`
+                        : filter === "pagado"
+                          ? `No hay estudiantes pagados ${scopeName}.`
+                          : `No hay estudiantes con frecuencia ${
+                              filters.find((f) => f.value === filter)?.label.toLowerCase() ?? ""
+                            } ${scopeName}.`
+                  }
+                />
+              ) : (
+                <div className="space-y-3 md:grid md:grid-cols-2 xl:grid-cols-3 md:gap-3 md:space-y-0">
+                  {filtered.map((s) => (
+                    <StudentCard
+                      key={s.id}
+                      student={s}
+                      onClick={() => setSelectedId(s.id)}
+                      onQuickPay={() => onQuickPay(s)}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+        </>
       )}
 
       {/* Crear estudiante */}
-      <StudentForm 
-        open={formOpen} 
-        onClose={() => setFormOpen(false)} 
-        onSaved={onCreate} 
+      <StudentForm
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        onSaved={onCreate}
         routes={routes}
       />
 
       {/* Editar estudiante */}
-      <StudentForm 
-        open={editing !== null} 
-        onClose={() => setEditing(null)} 
-        onSaved={onUpdate} 
+      <StudentForm
+        open={editing !== null}
+        onClose={() => setEditing(null)}
+        onSaved={onUpdate}
         initial={editing}
         routes={routes}
       />
@@ -358,6 +458,20 @@ export default function TransporteClient({
           </div>
         )}
       </Modal>
+
+      {receiptOpen && (
+        <StudentReceiptDialog
+          students={students}
+          routes={routes}
+          onClose={() => setReceiptOpen(false)}
+          onGenerated={(data) => {
+            setReceiptOpen(false);
+            setStudentReceipt(data);
+          }}
+        />
+      )}
+
+      <StudentPaymentReceipt data={studentReceipt} onClose={() => setStudentReceipt(null)} />
 
       <Toast message={toast} />
     </div>

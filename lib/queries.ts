@@ -149,6 +149,26 @@ export async function getPayments(): Promise<Payment[]> {
   return rows.map(mapPayment);
 }
 
+/** Pagos completados de un estudiante dentro de un rango (fechas inclusivas). */
+export async function getStudentPaymentsInRange(
+  studentId: string,
+  from: string,
+  to: string
+): Promise<Payment[]> {
+  const rows = await query(
+    `select id, client_name, date, concept, amount, method, status::text as status, period, observation,
+            student_id, client_id, service_id, advance,
+            null::uuid as route_id, null::int as days_paid, null::int as fee_per_day, 'payment'::text as source
+       from payments
+      where student_id = $1
+        and status = 'completado'
+        and date between $2 and $3
+      order by date, created_at`,
+    [studentId, from, to]
+  );
+  return rows.map(mapPayment);
+}
+
 export interface DashboardData {
   today: string;
   todayServices: Service[];
