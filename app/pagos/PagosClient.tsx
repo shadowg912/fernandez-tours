@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Client, Payment, PaymentDraft, Student } from "@/lib/types";
+import { Client, Payment, PaymentDraft, Service, Student } from "@/lib/types";
 import { createPayment, deletePayment, markPaymentPaid, updatePayment } from "@/lib/actions";
+import { periodRange } from "@/lib/dates";
 import { formatMoney } from "@/lib/format";
 import { PaymentCard, SummaryCard } from "@/components/cards";
 import { Button, Toast } from "@/components/ui";
 import { ConfirmDialog, PaymentForm, PaymentFormResult } from "@/components/forms";
-import { RoutePaymentReceipt, RouteReceiptData } from "@/components/receipts";
+import { RoutePaymentReceipt, RouteReceiptData, ServicePaymentReceipt, ServiceReceiptData } from "@/components/receipts";
 import { IconPlus, IconSearch } from "@/components/icons";
 
 type StatusFilter = "todos" | "completado" | "pendiente";
+type PeriodFilter = "mensual" | "trimestral" | "todos";
 
 function draftFromResult(p: PaymentFormResult): PaymentDraft {
   return {
@@ -25,6 +27,7 @@ function draftFromResult(p: PaymentFormResult): PaymentDraft {
     ...(p.observation ? { observation: p.observation } : {}),
     ...(p.studentId ? { studentId: p.studentId } : {}),
     ...(p.clientId ? { clientId: p.clientId } : {}),
+    ...(p.serviceId ? { serviceId: p.serviceId } : {}),
   };
 }
 
@@ -32,22 +35,23 @@ export default function PagosClient({
   payments,
   students,
   clients,
+  services,
 }: {
   payments: Payment[];
   students: Student[];
   clients: Client[];
+  services: Service[];
 }) {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Payment | null>(null);
   const [deleting, setDeleting] = useState<Payment | null>(null);
   const [receipt, setReceipt] = useState<RouteReceiptData | null>(null);
+  const [serviceReceipt, setServiceReceipt] = useState<ServiceReceiptData | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const [query, setQuery] = useState("");
-  const [month, setMonth] = useState("");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const [period, setPeriod] = useState<PeriodFilter>("mensual");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("todos");
 
   useEffect(() => {
@@ -58,20 +62,18 @@ export default function PagosClient({
 
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();
+    const range = period === "todos" ? null : periodRange(period);
     return payments.filter((p) => {
       if (statusFilter !== "todos" && p.status !== statusFilter) return false;
       if (q && !p.clientName.toLowerCase().includes(q) && !p.concept.toLowerCase().includes(q)) return false;
-      if (from && p.date < from) return false;
-      if (to && p.date > to) return false;
-      if (!from && !to && month && !p.date.startsWith(month)) return false;
+      if (range && (p.date < range.from || p.date > range.to)) return false;
       return true;
     });
-  }, [payments, query, statusFilter, from, to, month]);
+  }, [payments, query, statusFilter, period]);
 
   const collected = list.filter((p) => p.status === "completado").reduce((s, p) => s + p.amount, 0);
   const pendingAmount = list.filter((p) => p.status === "pendiente").reduce((s, p) => s + p.amount, 0);
   const pendingCount = list.filter((p) => p.status === "pendiente").length;
-  const hasDateFilter = Boolean(month || from || to);
 
   const run = (fn: () => Promise<void>, message: string) => {
     startTransition(async () => {
@@ -106,6 +108,35 @@ export default function PagosClient({
 
   const onMarkPaid = (p: Payment) => run(async () => { await markPaymentPaid(p.id); }, "Pago marcado como completado");
 
+  const openServiceReceipt = (serviceId: string) => {
+    const service = services.find((s) => s.id === serviceId);
+    if (!service) return;
+    const linkedPayments = payments
+      .filter((p) => p.serviceId === serviceId)
+      .reverse();
+    if (!linkedPayments.some((p) => p.status === "completado")) return;
+
+    setServiceReceipt({
+      serviceId: service.id,
+      clientName: service.clientName,
+      serviceDate: service.date,
+      time: service.time,
+      origin: service.origin,
+      destination: service.destination,
+      passengers: service.passengers,
+      price: service.price,
+      payments: linkedPayments.map((p) => ({
+        id: p.id,
+        date: p.date,
+        concept: p.concept,
+        amount: p.amount,
+        method: p.method,
+        status: p.status,
+        advance: p.advance,
+      })),
+    });
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3">
@@ -134,68 +165,44 @@ export default function PagosClient({
           />
         </div>
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          <input
-            type="month"
-            value={month}
-            onChange={(e) => {
-              setMonth(e.target.value);
-              setFrom("");
-              setTo("");
-            }}
-            className="rounded-xl border border-dark/15 bg-white px-4 py-3 text-sm focus:border-teal"
-          />
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={from}
-              onChange={(e) => {
-                setFrom(e.target.value);
-                setMonth("");
-              }}
-              className="rounded-xl border border-dark/15 bg-white px-3 py-3 text-sm focus:border-teal"
-            />
-            <span className="text-dark/40">—</span>
-            <input
-              type="date"
-              value={to}
-              onChange={(e) => {
-                setTo(e.target.value);
-                setMonth("");
-              }}
-              className="rounded-xl border border-dark/15 bg-white px-3 py-3 text-sm focus:border-teal"
-            />
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-dark/45">Periodo</p>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {(["mensual", "trimestral", "todos"] as const).map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setPeriod(p)}
+                className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-medium transition-all ${
+                  period === p
+                    ? "bg-teal text-white shadow-sm"
+                    : "bg-white text-dark/70 border border-dark/10 hover:border-teal"
+                }`}
+              >
+                {p === "mensual" ? "Mensual" : p === "trimestral" ? "Trimestral" : "Todos"}
+              </button>
+            ))}
           </div>
-          {hasDateFilter && (
-            <button
-              type="button"
-              onClick={() => {
-                setMonth("");
-                setFrom("");
-                setTo("");
-              }}
-              className="rounded-xl border border-dark/15 bg-white px-4 py-3 text-sm text-dark/70 transition-colors hover:border-teal"
-            >
-              Limpiar fechas
-            </button>
-          )}
         </div>
 
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {(["todos", "completado", "pendiente"] as const).map((f) => (
-            <button
-              key={f}
-              type="button"
-              onClick={() => setStatusFilter(f)}
-              className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-medium transition-all ${
-                statusFilter === f
-                  ? "bg-teal text-white shadow-sm"
-                  : "bg-white text-dark/70 border border-dark/10 hover:border-teal"
-              }`}
-            >
-              {f === "todos" ? "Todos" : f === "completado" ? "Completados" : "Pendientes"}
-            </button>
-          ))}
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-dark/45">Estado</p>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {(["todos", "completado", "pendiente"] as const).map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setStatusFilter(f)}
+                className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-medium transition-all ${
+                  statusFilter === f
+                    ? "bg-teal text-white shadow-sm"
+                    : "bg-white text-dark/70 border border-dark/10 hover:border-teal"
+                }`}
+              >
+                {f === "todos" ? "Todos" : f === "completado" ? "Completados" : "Pendientes"}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -208,6 +215,10 @@ export default function PagosClient({
           {list.map((p) => {
             // Los pagos de ruta son solo lectura: se editan desde /rutas.
             const isRoutePayment = p.source === "route_payment" || Boolean(p.routeId);
+            const serviceId = p.serviceId;
+            const canViewServiceReceipt = serviceId
+              ? payments.some((x) => x.serviceId === serviceId && x.status === "completado")
+              : false;
             return (
               <PaymentCard
                 key={`${p.source ?? "payment"}-${p.id}`}
@@ -215,16 +226,22 @@ export default function PagosClient({
                 onEdit={isRoutePayment ? undefined : () => { setEditing(p); setFormOpen(true); }}
                 onDelete={isRoutePayment ? undefined : () => setDeleting(p)}
                 onMarkPaid={isRoutePayment ? undefined : () => onMarkPaid(p)}
-                onViewReceipt={isRoutePayment ? () => setReceipt({
-                  id: p.id,
-                  routeName: p.clientName,
-                  daysPaid: p.daysPaid ?? 0,
-                  feePerDay: p.feePerDay ?? (p.daysPaid ? Math.round(p.amount / p.daysPaid) : 0),
-                  amount: p.amount,
-                  paymentDate: p.date,
-                  method: p.method,
-                  ...(p.observation ? { observation: p.observation } : {}),
-                }) : undefined}
+                onViewReceipt={
+                  isRoutePayment
+                    ? () => setReceipt({
+                        id: p.id,
+                        routeName: p.clientName,
+                        daysPaid: p.daysPaid ?? 0,
+                        feePerDay: p.feePerDay ?? (p.daysPaid ? Math.round(p.amount / p.daysPaid) : 0),
+                        amount: p.amount,
+                        paymentDate: p.date,
+                        method: p.method,
+                        ...(p.observation ? { observation: p.observation } : {}),
+                      })
+                    : serviceId && canViewServiceReceipt
+                      ? () => openServiceReceipt(serviceId)
+                      : undefined
+                }
               />
             );
           })}
@@ -238,6 +255,7 @@ export default function PagosClient({
         initial={editing ?? undefined}
         students={students}
         clients={clients}
+        services={services}
       />
 
       <ConfirmDialog
@@ -250,6 +268,7 @@ export default function PagosClient({
       />
 
       <RoutePaymentReceipt data={receipt} onClose={() => setReceipt(null)} />
+      <ServicePaymentReceipt data={serviceReceipt} onClose={() => setServiceReceipt(null)} />
 
       <Toast message={toast} />
     </div>

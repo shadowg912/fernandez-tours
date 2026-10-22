@@ -150,6 +150,16 @@ export function IconCopy(props: IconProps) {
   );
 }
 
+export function IconDots(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
+      <circle cx="12" cy="5" r="1.6" />
+      <circle cx="12" cy="12" r="1.6" />
+      <circle cx="12" cy="19" r="1.6" />
+    </svg>
+  );
+}
+
 export function IconFileText(props: IconProps) {
   return (
     <svg {...base(props)}>

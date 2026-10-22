@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useTransition } from "react";
 import { DailyRoute, RouteExecution, Service } from "@/lib/types";
 import { formatDateLong, formatMoney } from "@/lib/format";
 import { Button, EmptyState, StatusBadge, Card, Modal, Toast } from "@/components/ui";
 import { IconChevronLeft, IconChevronRight, IconBus, IconRoute } from "@/components/icons";
 import { completeService, cancelService, toggleExecutionStatus } from "@/lib/actions";
+import { ServiceCompletionDialog } from "@/components/service-completion";
 
 type ViewMode = "day" | "week" | "month";
 
@@ -55,8 +56,10 @@ export default function AgendaClient({
   const [mode, setMode] = useState<ViewMode>("day");
   const [date, setDate] = useState(today);
   const [selectedItem, setSelectedItem] = useState<AgendaItem | null>(null);
+  const [completingService, setCompletingService] = useState<Service | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "services" | "routes">("all");
+  const [pending, startTransition] = useTransition();
 
   // Calculate date range based on mode
   const getRange = (mode: ViewMode, dateStr: string): { start: string; end: string; label: string } => {
@@ -158,13 +161,24 @@ export default function AgendaClient({
   // Actions
   const handleServiceAction = (serviceId: string, action: "complete" | "cancel") => {
     if (action === "complete") {
-      completeService(serviceId);
-      setToast("Servicio completado");
+      const service = services.find((s) => s.id === serviceId) ?? null;
+      if (!service) return;
+      setSelectedItem(null);
+      setCompletingService(service);
     } else {
       cancelService(serviceId);
       setToast("Servicio cancelado");
+      setSelectedItem(null);
     }
-    setSelectedItem(null);
+  };
+
+  const confirmComplete = (pay: boolean) => {
+    if (!completingService) return;
+    startTransition(async () => {
+      await completeService(completingService.id, pay);
+      setCompletingService(null);
+      setToast(pay ? "Servicio completado y pago registrado" : "Servicio completado");
+    });
   };
 
   const handleRouteAction = (routeId: string, executionDate: string, newStatus: "done" | "skipped") => {
@@ -325,6 +339,10 @@ export default function AgendaClient({
               <p><span className="font-semibold">Ruta:</span> {selectedService.origin} → {selectedService.destination}</p>
               <p><span className="font-semibold">Pasajeros:</span> {selectedService.passengers}</p>
               <p><span className="font-semibold">Precio:</span> <span className="text-gold-deep font-bold">{formatMoney(selectedService.price)}</span></p>
+              <p><span className="font-semibold">Pagado:</span> <span className="text-green font-bold">{formatMoney(selectedService.paidAmount ?? 0)}</span></p>
+              {selectedService.status !== "cancelado" && (
+                <p><span className="font-semibold">Pendiente:</span> <span className={`font-bold ${selectedService.price - (selectedService.paidAmount ?? 0) > 0 ? "text-orange" : "text-green"}`}>{formatMoney(Math.max(0, selectedService.price - (selectedService.paidAmount ?? 0)))}</span></p>
+              )}
               <p><span className="font-semibold">Estado:</span> <StatusBadge status={selectedService.status} /></p>
             </div>
             
@@ -377,6 +395,13 @@ export default function AgendaClient({
           </div>
         )}
       </Modal>
+
+      <ServiceCompletionDialog
+        service={completingService}
+        onClose={() => setCompletingService(null)}
+        onConfirm={confirmComplete}
+        loading={pending}
+      />
 
       <Toast message={toast} />
     </div>

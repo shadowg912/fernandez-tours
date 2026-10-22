@@ -10,6 +10,8 @@ export interface Service {
   passengers: number;
   price: number;
   status: ServiceStatus;
+  /** Derivado: suma de pagos completados del servicio. No es columna. */
+  paidAmount?: number;
 }
 
 export interface Client {
@@ -65,6 +67,7 @@ export interface Payment {
   observation?: string;
   studentId?: string;   // vínculo a students (opcional)
   clientId?: string;    // vínculo a clients (opcional)
+  serviceId?: string;   // vínculo a services (pago de servicio)
   advance: boolean;     // pago por adelantado
   /** Origen del registro: pago normal o pago de ruta diaria (solo lectura). */
   source?: "payment" | "route_payment";
@@ -144,5 +147,6 @@ export interface PaymentDraft {
   observation?: string;
   studentId?: string;
   clientId?: string;
+  serviceId?: string;
   advance: boolean;
 }

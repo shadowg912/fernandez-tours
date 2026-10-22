@@ -6,6 +6,7 @@ import { createService, completeService, cancelService, confirmService } from "@
 import { ServiceCard } from "@/components/cards";
 import { Button, EmptyState, Modal, StatusBadge, Toast } from "@/components/ui";
 import { ConfirmDialog, ServiceForm } from "@/components/forms";
+import { ServiceCompletionDialog } from "@/components/service-completion";
 import { formatDateLong, formatMoney } from "@/lib/format";
 import { IconPlus } from "@/components/icons";
 
@@ -26,9 +27,9 @@ export default function ServiciosClient({ services }: { services: Service[] }) {
   const [formOpen, setFormOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const [completing, setCompleting] = useState<string | null>(null);
+  const [completingService, setCompletingService] = useState<Service | null>(null);
   const [cancelling, setCancelling] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
+  const [pending, startTransition] = useTransition();
 
   useEffect(() => {
     if (!toast) return;
@@ -49,17 +50,17 @@ export default function ServiciosClient({ services }: { services: Service[] }) {
     });
   };
 
-  const handleComplete = (service: Service) => setCompleting(service.id);
+  const handleComplete = (service: Service) => setCompletingService(service);
   const handleCancel = (service: Service) => setCancelling(service.id);
   const handleConfirm = (service: Service) => confirmService(service.id);
 
-  const confirmComplete = () => {
-    if (!completing) return;
+  const confirmComplete = (pay: boolean) => {
+    if (!completingService) return;
     run(async () => {
-      await completeService(completing);
-      setCompleting(null);
+      await completeService(completingService.id, pay);
+      setCompletingService(null);
       setSelected(null);
-    }, "Servicio completado");
+    }, pay ? "Servicio completado y pago registrado" : "Servicio completado");
   };
 
   const confirmCancel = () => {
@@ -161,19 +162,21 @@ export default function ServiciosClient({ services }: { services: Service[] }) {
               <p><span className="font-semibold">Ruta:</span> {selectedService.origin} → {selectedService.destination}</p>
               <p><span className="font-semibold">Pasajeros:</span> {selectedService.passengers}</p>
               <p><span className="font-semibold">Precio:</span> <span className="text-gold-deep font-bold">{formatMoney(selectedService.price)}</span></p>
+              <p><span className="font-semibold">Pagado:</span> <span className="text-green font-bold">{formatMoney(selectedService.paidAmount ?? 0)}</span></p>
+              {selectedService.status !== "cancelado" && (
+                <p><span className="font-semibold">Pendiente:</span> <span className={`font-bold ${selectedService.price - (selectedService.paidAmount ?? 0) > 0 ? "text-orange" : "text-green"}`}>{formatMoney(Math.max(0, selectedService.price - (selectedService.paidAmount ?? 0)))}</span></p>
+              )}
             </div>
             <Button variant="ghost" className="w-full" onClick={() => setSelected(null)}>Cerrar</Button>
           </div>
         )}
       </Modal>
 
-      <ConfirmDialog
-        open={completing !== null}
-        onClose={() => setCompleting(null)}
+      <ServiceCompletionDialog
+        service={completingService}
+        onClose={() => setCompletingService(null)}
         onConfirm={confirmComplete}
-        title="Completar servicio"
-        message="¿Marcar este servicio como completado?"
-        confirmLabel="Completar"
+        loading={pending}
       />
 
       <ConfirmDialog

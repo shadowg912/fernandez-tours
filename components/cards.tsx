@@ -57,6 +57,8 @@ export function ServiceCard({
   const canConfirm = service.status === "pendiente_confirmacion";
   const canComplete = service.status === "confirmado";
   const canCancel = service.status === "confirmado" || service.status === "pendiente_confirmacion";
+  const paid = service.paidAmount ?? 0;
+  const pending = Math.max(0, service.price - paid);
   
   return (
     <div className="w-full" onClick={onClick}>
@@ -65,12 +67,14 @@ export function ServiceCard({
           <div className="min-w-0">
             <p className="text-sm font-bold text-dark-teal">{service.time}</p>
             <p className="mt-0.5 font-semibold truncate">{service.clientName}</p>
-            <p className="text-sm text-dark/60 truncate">
-              {service.origin} → {service.destination}
-            </p>
-            <p className="mt-1 text-xs text-dark/50">
-              {formatDateShort(service.date)} · {service.passengers} pasajero{service.passengers !== 1 ? "s" : ""}
-            </p>
+            <p className="mt-1 text-xs text-dark/50">{formatDateShort(service.date)}</p>
+            {service.status !== "cancelado" && (
+              <p className="mt-1 text-xs">
+                <span className={pending > 0 ? "font-semibold text-orange" : "text-dark/50"}>
+                  Pendiente {formatMoney(pending)}
+                </span>
+              </p>
+            )}
           </div>
           <div className="text-right shrink-0">
             <Money amount={service.price} className="text-gold-deep" />
@@ -248,7 +252,7 @@ export function PaymentCard({
   const isRoutePayment = payment.source === "route_payment" || Boolean(payment.routeId);
   const linkLabel = isRoutePayment
     ? `Ruta diaria · ${payment.daysPaid ?? 0} día${(payment.daysPaid ?? 0) === 1 ? "" : "s"}`
-    : payment.studentId ? "Estudiante" : payment.clientId ? "Cliente" : null;
+    : payment.serviceId ? "Servicio" : payment.studentId ? "Estudiante" : payment.clientId ? "Cliente" : null;
   const hasActions = Boolean(onEdit || onDelete || onMarkPaid || onViewReceipt);
   return (
     <Card className="p-4">
