@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { PDFDocument, PDFFont, StandardFonts, rgb } from "pdf-lib";
 import { query } from "@/lib/db";
+import { getSession } from "@/lib/auth";
 import { formatDateWithYear, formatMonthYear, formatMoney } from "@/lib/format";
 import { LOGO_RECEIPT_PNG_BASE64 } from "@/lib/logo-receipt";
 
@@ -88,6 +89,11 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const session = await getSession();
+  if (!session) {
+    return new NextResponse("No autorizado", { status: 401 });
+  }
+
   const { id } = await params;
   if (!UUID_RE.test(id)) {
     return new NextResponse("Recibo no encontrado", { status: 404 });

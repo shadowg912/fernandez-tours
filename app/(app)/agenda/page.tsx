@@ -1,9 +1,11 @@
 import { getServices, getRouteExecutionsForDateRange, getDailyRoutes } from "@/lib/queries";
+import { requireUser } from "@/lib/auth";
 import AgendaClient from "./AgendaClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function AgendaPage() {
+  await requireUser();
   const today = new Date().toISOString().slice(0, 10);
   
   // Calculate date range: 1 year back to 2 years forward

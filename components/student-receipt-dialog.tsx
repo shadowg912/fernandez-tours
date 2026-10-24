@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Route, Student } from "@/lib/types";
 import { periodRange } from "@/lib/dates";
 import { formatDateWithYear } from "@/lib/format";
-import { loadStudentPayments } from "@/app/transporte/actions";
+import { loadStudentPayments } from "@/app/(app)/transporte/actions";
 import { Button, ErrorBanner, Field, Input, Modal, Select } from "./ui";
 import { StudentReceiptData } from "./receipts";
 
