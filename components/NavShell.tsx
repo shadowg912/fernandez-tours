@@ -53,7 +53,7 @@ export default function NavShell({ children }: { children: ReactNode }) {
           ))}
         </nav>
         <div className="px-6 py-4 border-t border-white/10 text-xs text-cream/50">
-          Demo visual · Datos de prueba
+          Panel privado
         </div>
       </aside>
 

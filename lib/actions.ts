@@ -5,6 +5,8 @@ import { ClientDraft, DailyRouteDraft, PaymentDraft, Route, ServiceDraft, Studen
 
 // Lazy import to avoid bundling pg/client-side
 async function getQuery() {
+  const { assertSession } = await import("@/lib/auth");
+  await assertSession();
   const { query } = await import("@/lib/db");
   return query;
 }

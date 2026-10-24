@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import NavShell from "@/components/NavShell";
 
 export const metadata: Metadata = {
   title: "Fernández Tours",
@@ -23,7 +22,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             __html: `(function(){try{var t=localStorage.getItem('theme');document.documentElement.classList.toggle('dark',t==='dark');}catch(e){}})();`,
           }}
         />
-        <NavShell>{children}</NavShell>
+        {children}
       </body>
     </html>
   );
